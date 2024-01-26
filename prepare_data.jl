@@ -35,7 +35,7 @@ end
 
 function get_POI(file::String, save_as::String = "")
     if file[end-2:end] == "osm"
-        save_file(file,save_as)
+        save_asm(file,save_as)
         return OSMToolset.find_poi(file)
     elseif file[end-2:end] == "csv"
         return DataFrame(CSV.File(file))
