@@ -37,10 +37,13 @@ function save_as(file::String,save_as::String)
     end
 end
 
-function get_POI(file::String,config = "", save_as::String = "")
+function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     if endswith(file,"osm")
-        fl = OSMToolset.find_poi(file;config)
-        save_asm(fl,save_as)
+        if isnothing(scrape_config)
+            scrape_config = OSMToolset.ScrapePOIConfig()
+        end
+        fl = OSMToolset.find_poi(file;scrape_config)
+        #save_asm(fl,save_as)#TODO missing function
         return fl
     elseif endswith(file,"csv")
         return DataFrame(CSV.File(file))
