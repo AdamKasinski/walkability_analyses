@@ -31,9 +31,9 @@ function create_map(file::String)
     return get_map_data(file,use_cache = false)
 end
 
-function save_as(file::String,save_as::String)
+function save_asm(file::DataFrame,save_as::String)
     if save_as != ""
-        CSV.write("save_as",file)
+        CSV.write(save_as,file)
     end
 end
 
@@ -43,7 +43,7 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
             scrape_config = OSMToolset.ScrapePOIConfig()
         end
         fl = OSMToolset.find_poi(file;scrape_config)
-        #save_asm(fl,save_as)#TODO missing function
+        save_asm(fl,save_as)
         return fl
     elseif endswith(file,"csv")
         return DataFrame(CSV.File(file))

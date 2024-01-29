@@ -1,7 +1,7 @@
 using OpenStreetMapX
 using OSMToolset
 using Statistics
-
+include("prepare_data.jl")
 
 """
 generate n points around the center within boundries
@@ -25,10 +25,8 @@ generate n sectors
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
 """
-
 function generate_sectors(num_of_sectors::Int,size_of_sector::Int,centre::LLA,num_of_points::Int)
-    sectors = Array{Any,2}(undef,num_of_sectors,num_of_points)
-    #TODO Avoid Any matrix in Julia!
+    sectors = Array{LLA,2}(undef,num_of_sectors,num_of_points)
     for sector in 1:num_of_sectors
         boundries::Tuple{Int,Int} = ((sector-1)*size_of_sector+1,sector*size_of_sector)
         sectors[sector,:] = generate_points_in_sector(boundries,centre,num_of_points)
@@ -45,12 +43,15 @@ function find_point_within_boundries(boundries::Tuple{Int,Int}, centre::LLA, rad
 end
 
 """
-- 'points'::Array{Any,2} - matrix with LLA points
+- 'points'::Array{LLA,2} - matrix with LLA points
 - 'attractivenessSpatIndex'::attractivenessSpatIndex
 - 'attribute'::Symbol - The category that will be used to calculate attractiveness
                         (:education, :entertainment, :healthcare, :leisure, :parking,
                         :restaurants, :shopping, :transport)
 """
+
+
+
 function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex,
                                                                 attribute::Symbol)
     dim1, dim2 = size(points_matrix)
@@ -65,3 +66,9 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
     end
     return attract
 end
+
+
+df_amsterdam = get_POI("Amsterdam.csv")
+ix_amsterdam = AttractivenessSpatIndex(df_amsterdam)
+points_amsterdam = generate_sectors(10,1000,center_amsterdam,200)
+attr_amsterdam = calculate_attractiveness_of_sector(points_amsterdam,ix_amsterdam,:transport)
