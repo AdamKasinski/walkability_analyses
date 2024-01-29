@@ -33,7 +33,7 @@ function save_as(file::String,save_as::String)
     end
 end
 
-function get_POI(file::String,config, save_as::String = "")
+function get_POI(file::String,config = "", save_as::String = "")
     if file[end-2:end] == "osm"
         fl = OSMToolset.find_poi(file;config)
         save_asm(fl,save_as)
