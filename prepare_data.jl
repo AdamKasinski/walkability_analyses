@@ -11,15 +11,19 @@ function download_data(city::String)
         return "The file is already downloaded"
     else
         url = string("https://download.bbbike.org/osm/bbbike/",city,"/",city,".osm.gz")
-        output = "file.osm.gz"
+        output =  tempname()*".gz"
         Downloads.download(url,output)
         tname = string(city,".osm")
-        GZip.open("file.osm.gz", "r") do io
+        buf = Vector{UInt8}(undef, 1024)
+        GZip.open(output, "r") do f
             open(tname, "w") do out
-                write(out, read(io))
+                while !eof(f)
+                    nb = readbytes!(f, buf)
+                    write(out, @view buf[1:nb])
+                end
             end
         end
-        rm("file.osm.gz"; recursive=false)
+        rm(output; recursive=false)
     end
 end
 
@@ -34,11 +38,11 @@ function save_as(file::String,save_as::String)
 end
 
 function get_POI(file::String,config = "", save_as::String = "")
-    if file[end-2:end] == "osm"
+    if endswith(file,"osm")
         fl = OSMToolset.find_poi(file;config)
         save_asm(fl,save_as)
         return fl
-    elseif file[end-2:end] == "csv"
+    elseif endswith(file,"csv")
         return DataFrame(CSV.File(file))
     end
 end

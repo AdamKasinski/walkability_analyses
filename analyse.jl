@@ -4,7 +4,7 @@ using Statistics
 
 
 """
-generate n points around the center within boundries 
+generate n points around the center within boundries
 
 - 'boundries'::Int - segment on which a point will be drawn
 - 'centre'::LLA - centre of the circle
@@ -28,15 +28,16 @@ generate n sectors
 
 function generate_sectors(num_of_sectors::Int,size_of_sector::Int,centre::LLA,num_of_points::Int)
     sectors = Array{Any,2}(undef,num_of_sectors,num_of_points)
+    #TODO Avoid Any matrix in Julia!
     for sector in 1:num_of_sectors
         boundries::Tuple{Int,Int} = ((sector-1)*size_of_sector+1,sector*size_of_sector)
         sectors[sector,:] = generate_points_in_sector(boundries,centre,num_of_points)
     end
     return sectors
-end 
+end
 
 """
-generate a point on a segment of a specified length 
+generate a point on a segment of a specified length
 """
 function find_point_within_boundries(boundries::Tuple{Int,Int}, centre::LLA, radian::Float64)
     distance = rand(boundries[1]:boundries[2])
@@ -45,15 +46,14 @@ end
 
 """
 - 'points'::Array{Any,2} - matrix with LLA points
-- 'attractivenessSpatIndex'::attractivenessSpatIndex 
-- 'attribute'::Symbol - The category that will be used to calculate attractiveness 
-                        (:education, :entertainment, :healthcare, :leisure, :parking, 
+- 'attractivenessSpatIndex'::attractivenessSpatIndex
+- 'attribute'::Symbol - The category that will be used to calculate attractiveness
+                        (:education, :entertainment, :healthcare, :leisure, :parking,
                         :restaurants, :shopping, :transport)
 """
 function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex,
                                                                 attribute::Symbol)
-    dim1 = size(points_matrix,1)
-    dim2 = size(points_matrix,2)
+    dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
     for i in 1:dim1
         attr = zeros(Float64,dim2)
