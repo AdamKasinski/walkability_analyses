@@ -2,12 +2,6 @@ using OpenStreetMapX
 using OSMToolset
 using Statistics
 
-#TODO: 1) change find_point_within_distance to find_point_within_sector - add paraemeter bounds
-#      2) create function generate circles in city
-#      3) generate attractiveness of each point - change default configuration
-#      4) generate plots
-
-
 
 """
 generate n points around the center within boundries 
@@ -49,14 +43,23 @@ function find_point_within_boundries(boundries::Tuple{Int,Int}, centre::LLA, rad
     return LLA(ENU(distance*cos(radian),distance*sin(radian),0),centre)
 end
 
-function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex)
+"""
+- 'points'::Array{Any,2} - matrix with LLA points
+- 'attractivenessSpatIndex'::attractivenessSpatIndex 
+- 'attribute'::Symbol - The category that will be used to calculate attractiveness 
+                        (:education, :entertainment, :healthcare, :leisure, :parking, 
+                        :restaurants, :shopping, :transport)
+"""
+function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex,
+                                                                attribute::Symbol)
     dim1 = size(points_matrix,1)
     dim2 = size(points_matrix,2)
-    attract = zeros(Float64,dim1)
-    for i in dim1
+    attract = Array{Float64}(undef, dim1)
+    for i in 1:dim1
         attr = zeros(Float64,dim2)
-        for j in dim2
-            attr[j] = OSMToolset.attractiveness(attractivenessSpatIndex,points[i,j])
+        for j in 1:dim2
+            attr[j] = getfield(OSMToolset.attractiveness(
+                attractivenessSpatIndex,points[i,j]),attribute)
         end
         attract[i] = mean(attr)
     end
