@@ -67,8 +67,3 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
     return attract
 end
 
-
-df_amsterdam = get_POI("Amsterdam.csv")
-ix_amsterdam = AttractivenessSpatIndex(df_amsterdam)
-points_amsterdam = generate_sectors(10,1000,center_amsterdam,200)
-attr_amsterdam = calculate_attractiveness_of_sector(points_amsterdam,ix_amsterdam,:transport)
