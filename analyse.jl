@@ -60,7 +60,7 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
         attr = zeros(Float64,dim2)
         for j in 1:dim2
             attr[j] = getfield(OSMToolset.attractiveness(
-                attractivenessSpatIndex,points[i,j]),attribute)
+                attractivenessSpatIndex,points_matrix[i,j]),attribute)
         end
         attract[i] = mean(attr)
     end
