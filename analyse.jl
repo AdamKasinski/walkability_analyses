@@ -73,3 +73,8 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
     return attract
 end
 
+function min_max_scaling(vec::Vector{Float64})
+    mins = minimum(vec)
+    maxs = maximum(vec)
+    (vec.-mins)/(maxs-mins) 
+end
