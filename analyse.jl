@@ -61,8 +61,9 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 
     dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
-    attr = zeros(Float64,dim2)
-    for i in 1:dim1
+    attrs = [zeros(Float64,dim2) for _ in 1:Threads.nthreads()]
+    Threads.@threads for i in 1:dim1
+        attr = attrs[Threads.threadid()] 
         fill!(attr, 0.0)
         for j in 1:dim2
             attr[j] = getfield(OSMToolset.attractiveness(
@@ -78,3 +79,52 @@ function min_max_scaling(vec::Vector{Float64})
     maxs = maximum(vec)
     (vec.-mins)/(maxs-mins) 
 end
+
+function workflow(list_of_cities,num_of_sectors,distance_for_sector,points_in_sector,
+                    distance_to_analyse,csv)
+    maps = []
+    dfs = []
+    centers = []
+    ixs = []
+    points = []
+    attr_of_cities = []
+    stand_cities = []
+    x_axis = []
+    for city in list_of_cities
+        download_data(city)
+    end
+
+    centers = [LLA(50.061692315544654, 19.939496620660737),
+    LLA(49.196664523003115, 16.60804112914713),
+    LLA(50.29388096424714, 18.66566269980933)]
+
+    a = 1
+    for city in list_of_cities
+        map_of_city = get_map_data(string(city,".osm"))
+        center = OpenStreetMapX.center(map_of_city.bounds)
+        if csv
+            ct = get_POI(string(city,".csv"))
+        else
+            ct = get_POI(string(city,".osm"))
+        end
+
+        push!(dfs,ct)
+        push!(centers,center)
+        push!(ixs,AttractivenessSpatIndex(dfs[end],get_range=a->distance_to_analyse))
+        push!(points,generate_sectors(num_of_sectors,distance_for_sector,
+                                                            center,points_in_sector))
+        push!(attr_of_cities,calculate_attractiveness_of_sector(points[end],ixs[end],
+                                                                        :shopping))
+        push!(stand_cities,min_max_scaling(attr_of_cities[end]))
+        a+=1                                                                                                                                     
+    end
+    return stand_cities
+end
+
+#TODO: 1) add dicitonary with ceneters of the cities - bounds.center does not work correct
+#         for that task
+#      2) export the lists to file
+#      3) add more attributes
+#      4) generate PDF
+#      5) change config file
+#      6) add subcategories
