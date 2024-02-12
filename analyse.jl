@@ -80,51 +80,42 @@ function min_max_scaling(vec::Vector{Float64})
     (vec.-mins)/(maxs-mins) 
 end
 
-function workflow(list_of_cities,num_of_sectors,distance_for_sector,points_in_sector,
-                    distance_to_analyse,csv)
-    maps = []
+function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
+                                points_in_sector, distance_to_analyse,csv, center_dict,
+                                list_of_attributes)
+    
     dfs = []
     centers = []
     ixs = []
     points = []
-    attr_of_cities = []
-    stand_cities = []
-    x_axis = []
+
+    attr_of_cities = Dict(city => Dict(attribute => fill(0.0, num_of_sectors) for 
+                                attribute in list_of_attributes) for city in list_of_cities)
+
     for city in list_of_cities
         download_data(city)
     end
 
-    centers = [LLA(50.061692315544654, 19.939496620660737),
-    LLA(49.196664523003115, 16.60804112914713),
-    LLA(50.29388096424714, 18.66566269980933)]
+    for (index, city) in enumerate(list_of_cities)
 
-    a = 1
-    for city in list_of_cities
-        map_of_city = get_map_data(string(city,".osm"))
-        center = OpenStreetMapX.center(map_of_city.bounds)
         if csv
             ct = get_POI(string(city,".csv"))
         else
             ct = get_POI(string(city,".osm"))
-        end
+        end 
+
+        city_center = center_dict[city]
 
         push!(dfs,ct)
-        push!(centers,center)
-        push!(ixs,AttractivenessSpatIndex(dfs[end],get_range=a->distance_to_analyse))
+        push!(centers,city_center)
+        push!(ixs,AttractivenessSpatIndex(dfs[index],get_range=a->distance_to_analyse))
         push!(points,generate_sectors(num_of_sectors,distance_for_sector,
-                                                            center,points_in_sector))
-        push!(attr_of_cities,calculate_attractiveness_of_sector(points[end],ixs[end],
-                                                                        :shopping))
-        push!(stand_cities,min_max_scaling(attr_of_cities[end]))
-        a+=1                                                                                                                                     
+                                                            city_center,points_in_sector))
+        
+        for attribute in list_of_attributes
+            attr = calculate_attractiveness_of_sector(points[index],ixs[index], attribute)
+            attr_of_cities[city][attribute] = min_max_scaling(attr)
+        end
     end
-    return stand_cities
+    return attr_of_cities
 end
-
-#TODO: 1) add dicitonary with ceneters of the cities - bounds.center does not work correct
-#         for that task
-#      2) export the lists to file
-#      3) add more attributes
-#      4) generate PDF
-#      5) change config file
-#      6) add subcategories
