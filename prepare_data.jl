@@ -5,6 +5,77 @@ using Downloads
 using GZip
 using DataFrames
 using CSV
+using HTTP
+using JSON
+
+function download_data_api(city::String,admin_level = "8")
+    if isfile(string(city,".osm"))
+        return "The file is already downloaded"
+    end
+    relation_id = get_relation_id(city,admin_level)
+    download_data_relation(city,relation_id)
+    return get_city_bounds(city,admin_level)
+end
+
+function get_relation_id(city_name::String, admin_level::String)
+    query = """
+    [out:json];
+    area[name="$city_name"]->.searchArea;
+    relation(area.searchArea)["boundary"="administrative"]["admin_level"="$admin_level"];
+    out ids;
+    """
+    encoded_query = HTTP.escapeuri(query)
+    url = "http://overpass-api.de/api/interpreter?data=$encoded_query"
+    response = HTTP.get(url)
+  
+    if response.status == 200
+        data = JSON.parse(String(response.body))      
+        return get(data["elements"][1], "id", nothing)
+    else
+        return -1
+    end
+  end
+
+
+function download_data_relation(city_name::String,relation_id::Int)
+    f = 3600000000 + relation_id
+    query = """
+        [out:xml];
+        area($f)->.searchArea;
+        (
+        node(area.searchArea);
+        way(area.searchArea);
+        relation(area.searchArea);
+        );
+        (._; >;);
+        out meta;
+    """
+
+    overpass_url = "http://overpass-api.de/api/interpreter/"
+    response = HTTP.post(overpass_url, body = query)
+    
+    if response.status == 200
+        open(string(city_name,".osm"), "w") do file
+            write(file, String(response.body))
+        end
+    else
+        println("Failed to download OSM data")
+    end
+end
+
+function get_city_bounds(city_name::String,level::String)
+    query = """
+    [out:json];
+    area['admin_level'='$level']['name'='$city_name'];
+    (relation['admin_level'='$level'](area););
+    out geom;
+    """
+    overpass_url = "http://overpass-api.de/api/interpreter/"
+    response = HTTP.post(overpass_url, body = query)
+    a = String(response.body)
+    j = JSON.parse(a)
+    return j["elements"][1]["bounds"]  
+end
 
 function download_data(city::String)
     if isfile(string(city,".osm"))

@@ -3,8 +3,6 @@ using OSMToolset
 using Statistics
 include("prepare_data.jl")
 
-
-
 """
 generate n sectors
 
@@ -13,6 +11,7 @@ generate n sectors
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
 """
+
 function generate_sectors(num_of_sectors::Int,distance::Int,centre::LLA,num_of_points::Int)
     
     sectors = Array{LLA,2}(undef,num_of_sectors,num_of_points)
@@ -118,4 +117,13 @@ function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
         end
     end
     return attr_of_cities
+end
+
+
+function calculate_bounds(poi_df::DataFrame)
+    max_lat = maximum(poi_df[poi_df.value .!= "stop_position","lat"])
+    min_lat = minimum(poi_df[poi_df.value .!= "stop_position","lat"])
+    max_lon = maximum(poi_df[poi_df.value .!= "stop_position","lon"])
+    min_lon = minimum(poi_df[poi_df.value .!= "stop_position","lon"])
+    return min_lat,min_lon,max_lat,max_lon
 end
