@@ -55,7 +55,8 @@ function get_relation_id(city_name::String, admin_level::String)
   end
 
   """
-  method needs to be revised
+  because of the recursion the function currently downloads points
+outside the city
   """
 function __download_data_relation(city_name::String,relation_id::Int)
     f = 3600000000 + relation_id
