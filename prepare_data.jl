@@ -142,17 +142,19 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     end
 end
 
-function get_boundries_points(city::String)
+function get_boundries_points(city::String,center::LLA)
     query = """
     [out:xml];
-    area[name="$city"];
+    area[name="$city"]->.searchArea;
     (
-    relation["type"="boundary"]["name"="$city"];
+    relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="8"]["name"="$city"];
     );
-    (._; >;);
     out body;
+    >;
+    out skel qt;
     """
     url="http://overpass-api.de/api/interpreter/"
+
     response = HTTP.post(url,body=query)
 
     if response.status == 200
@@ -166,11 +168,15 @@ function get_boundries_points(city::String)
     osm_file = readxml(string(city,"_boundries.osm"))
 
     nodes_bounds = []
-    
+    a = 1
     for node in findall("//node", osm_file)
-        lat = parse(Float64, node["lat"])
-        lon = parse(Float64, node["lon"])
-        push!(nodes_bounds, (lat, lon))
+        if a != 1
+            lat = parse(Float64, node["lat"])
+            lon = parse(Float64, node["lon"])
+            point = ENU(LLA(lat,lon,0),center)
+            push!(nodes_bounds, point)
+        end
+        a+=1
     end
     
     return nodes_bounds
