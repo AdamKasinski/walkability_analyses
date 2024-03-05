@@ -199,3 +199,10 @@ function extract_points(city)
                     haskey(nodes_bounds, key)]
     return ordered_values
 end
+
+function check_if_inside(boundries, point)
+    lats = [i[1] for i in boundries]
+    lons = [i[2] for i in boundries]
+    polygon = Luxor.Point.(lats,lons)
+    return isinside(point,polygon; allowonedge=true)
+end
