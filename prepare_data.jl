@@ -164,20 +164,38 @@ function get_boundries_points(city::String,center::LLA)
     else
         println("Failed to download $city boundries data")
     end
+end
 
+function extract_points(city)
     osm_file = readxml(string(city,"_boundries.osm"))
-
-    nodes_bounds = []
+    nodes_bounds = Dict{String, Tuple{Float64,Float64}}()
+    ways_refs = Dict{String, Vector{String}}()
+    way_order = []
     a = 1
-    for node in findall("//node", osm_file)
-        if a != 1
-            lat = parse(Float64, node["lat"])
-            lon = parse(Float64, node["lon"])
-            point = ENU(LLA(lat,lon,0),center)
-            push!(nodes_bounds, point)
+
+    for member in findall("//member", osm_file)
+        if member["type"] == "way" && member["role"] == "outer"
+            push!(way_order,member["ref"])
         end
-        a+=1
     end
-    
-    return nodes_bounds
+
+    for way in findall("//way", osm_file)
+        id = way["id"]
+        ways_refs[id] = [nd["ref"] for nd in findall("nd",way)]
+    end
+
+    for node in findall("//node", osm_file)
+        id = node["id"]
+        lat = parse(Float64, node["lat"])
+        lon = parse(Float64, node["lon"])
+        point = (lat,lon)
+        nodes_bounds[id] = point
+    end
+
+    order_ways = vcat([ways_refs[key] for key in way_order 
+                                    if haskey(ways_refs,key)]...)
+
+    ordered_values = [nodes_bounds[key] for key in order_ways if 
+                    haskey(nodes_bounds, key)]
+    return ordered_values
 end
