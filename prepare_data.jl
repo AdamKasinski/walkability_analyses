@@ -7,6 +7,10 @@ using DataFrames
 using CSV
 using HTTP
 using JSON
+using EzXML
+using DataFrames
+using Statistics
+# TODO jest balagan z bibliotekami, tu jest uzywane readxml a nie jest importowane (dodalem import)
 
 
 function download_city_with_bounds(city::String, admin_level::String)
@@ -45,9 +49,9 @@ function get_relation_id(city_name::String, admin_level::String)
     encoded_query = HTTP.escapeuri(query)
     url = "http://overpass-api.de/api/interpreter?data=$encoded_query"
     response = HTTP.get(url)
-  
+
     if response.status == 200
-        data = JSON.parse(String(response.body))      
+        data = JSON.parse(String(response.body))
         return get(data["elements"][1], "id", nothing)
     else
         return -1
@@ -74,7 +78,7 @@ function __download_data_relation(city_name::String,relation_id::Int)
 
     overpass_url = "http://overpass-api.de/api/interpreter/"
     response = HTTP.post(overpass_url, body = query)
-    
+
     if response.status == 200
         open(string(city_name,".osm"), "w") do file
             write(file, String(response.body))
@@ -95,7 +99,7 @@ function get_city_bounds(city_name::String,level::String)
     response = HTTP.post(overpass_url, body = query)
     a = String(response.body)
     j = JSON.parse(a)
-    return j["elements"][1]["bounds"]  
+    return j["elements"][1]["bounds"]
 end
 
 function download_data(city::String)
@@ -142,8 +146,9 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     end
 end
 
+# TODO to zwraca plik a nie punkty. Zaktualizowac nazwe fukcji
 function get_boundries_points(city::String)
-    
+
     if isfile(string(city,"_boundries.osm"))
         return "The file is already downloaded"
     end
@@ -168,10 +173,12 @@ function get_boundries_points(city::String)
     else
         println("Failed to download $city boundries data")
     end
+    #TODO zwrocic nazwe pliku
 end
 
+# TODO: argumentem powinna byc nazwa pliku a nie miasto
 function extract_points(city)
-    osm_file = readxml(string(city,"_boundries.osm"))
+    osm_file = readxml("$(city)_boundries.osm")
     nodes_bounds = Dict{String, Tuple{Float64,Float64}}()
     ways_refs = Dict{String, Vector{String}}()
     way_order = String[]
@@ -195,13 +202,48 @@ function extract_points(city)
         nodes_bounds[id] = point
     end
 
-    order_ways = vcat([ways_refs[key] for key in way_order 
+    order_ways = vcat([ways_refs[key] for key in way_order
                                     if haskey(ways_refs,key)]...)
 
-    ordered_values = [nodes_bounds[key] for key in order_ways if 
+    ordered_values = [nodes_bounds[key] for key in order_ways if
                     haskey(nodes_bounds, key)]
     return ordered_values
 end
+
+
+
+function extract_points2(filename)
+    osm_file = readxml(filename)
+    #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
+    nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
+    #punkt referencyjny dla mapy, potem zrobic jako tez mozliwy parametr
+    reflla = LLA(mean(nodes.lat),mean(nodes.lon),0.0)
+    idtoENU = Dict{Int,ENU}(nodes.id .=> ENU.(LLA.(nodes.lat,nodes.lon,0.0),Ref(reflla)))
+
+    ways_refs = Dict{Int, Vector{Int}}()
+    # find all tags <way ...>...</way>
+    for way in findall("//way", osm_file)
+        id = parse(Int, way["id"])
+        ways_refs[id] = [parse(Int, nd["ref"]) for nd in findall("nd",way)]
+    end
+
+    rela = findall("//relation[tag[@k='boundary' and @v='administrative']]", osm_file)[1]
+
+    # find all tags member in the rela with <member type="way" role="outer"/>
+    res = DataFrame()
+    adminname = findall("tag[@k='name:en']", rela)[1]["v"]
+    for member in findall("member[@type='way' and @role='outer']", rela)
+        wayid = parse(Int, member["ref"])
+        nodes = ways_refs[wayid]
+        append!(res,DataFrame(adminname=adminname, wayid=wayid, nodes=nodes, x=getX.(getindex.(Ref(idtoENU),nodes)), y=getY.(getindex.(Ref(idtoENU),nodes) )))
+    end
+    res
+end
+
+#using Plots
+#res = extract_points2("Kraków_boundries.osm")
+#plot(res.x,res.y,group=res.wayid,seriestype=:line,legend=false, markerbordercolor=nothing, markersize=2, markerstrokewidth=0)
+#savefig("krakow_boundary.pdf")
 
 function check_if_inside(boundries, point)
     lats = [i[1] for i in boundries]
