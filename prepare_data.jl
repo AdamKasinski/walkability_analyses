@@ -142,16 +142,20 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     end
 end
 
-function get_boundries_points(city::String,center::LLA)
+function get_boundries_points(city::String)
+    
+    if isfile(string(city,"_boundries.osm"))
+        return "The file is already downloaded"
+    end
     query = """
-    [out:xml];
-    area[name="$city"]->.searchArea;
-    (
-    relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="8"]["name"="$city"];
-    );
-    out body;
-    >;
-    out skel qt;
+        [out:xml];
+        area[name="$city"]->.searchArea;
+        (
+        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="8"]["name"="$city"];
+        );
+        out body;
+        >;
+        out skel qt;
     """
     url="http://overpass-api.de/api/interpreter/"
 
