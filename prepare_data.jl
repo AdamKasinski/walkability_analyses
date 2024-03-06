@@ -170,8 +170,7 @@ function extract_points(city)
     osm_file = readxml(string(city,"_boundries.osm"))
     nodes_bounds = Dict{String, Tuple{Float64,Float64}}()
     ways_refs = Dict{String, Vector{String}}()
-    way_order = []
-    a = 1
+    way_order = String[]
 
     for member in findall("//member", osm_file)
         if member["type"] == "way" && member["role"] == "outer"
