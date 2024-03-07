@@ -245,9 +245,3 @@ end
 #plot(res.x,res.y,group=res.wayid,seriestype=:line,legend=false, markerbordercolor=nothing, markersize=2, markerstrokewidth=0)
 #savefig("krakow_boundary.pdf")
 
-function check_if_inside(boundries, point)
-    lats = [i[1] for i in boundries]
-    lons = [i[2] for i in boundries]
-    polygon = Luxor.Point.(lats,lons)
-    return isinside(point,polygon; allowonedge=true)
-end

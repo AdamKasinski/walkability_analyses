@@ -1,6 +1,7 @@
 using OpenStreetMapX
 using OSMToolset
 using Statistics
+using Luxor
 
 # TODO jest balagan z kolejnoscia importow bo jupyter notebook tez importuje prepare_data.jl
 # W kodzie trzeba miec porzadek bo inaczej ciezko goutrzymac i aktualizwoac
@@ -16,11 +17,13 @@ generate n sectors
 - 'num_of_points'::Int - number of points to generate in each sector
 """
 
-function generate_sectors(num_of_sectors::Int,distance::Int,centre::LLA,num_of_points::Int)
-
+function generate_sectors(num_of_sectors::Int,distance::Int,centre::LLA,num_of_points::Int,
+                    city_boundries_lat::Vector{Float64},city_boundries_lon::Vector{Float64})
+    city_boundries = Luxor.Point.(city_boundries_lat,city_boundries_lon)
     sectors = Array{LLA,2}(undef,num_of_sectors,num_of_points)
     for sector in 1:num_of_sectors
-        sectors[sector,:] = generate_points_in_sector(distance*sector,centre,num_of_points)
+        sectors[sector,:] = generate_points_in_sector(distance*sector,centre,num_of_points,
+                                                                    city_boundries)
     end
     return sectors
 end
@@ -33,9 +36,9 @@ generate n points around the center at a distance
 - 'num_of_points'::Int - number of points to generate
 """
 
-function generate_points_in_sector(distance::Int,centre::LLA,num_of_points::Int)
+function generate_points_in_sector(distance::Int,centre::LLA,num_of_points::Int,city_boundries)
     radian::Float64 = 360/num_of_points*π/180
-    points = [find_point_at_distance(distance, centre, point * radian)
+    points = [find_point_at_distance(distance, centre, point * radian, city_boundries)
                                             for point in 1:num_of_points]
     return points
 end
@@ -44,9 +47,13 @@ end
 """
 generate a point at a distance n from the center
 """
-function find_point_at_distance(radius::Int,centre::LLA, radian::Float64)
-    return LLA(ENU(radius*cos(radian),radius*sin(radian),0),centre)
-
+function find_point_at_distance(radius::Int,centre::LLA, radian::Float64,city_boundries)
+    point = LLA(ENU(radius*cos(radian),radius*sin(radian),0),centre)
+    pt = Luxor.Point(point.lat, point.lon)
+    if check_if_inside(city_boundries,pt)
+        return point
+    end
+    return LLA(0,0,0)
 end
 
 """
@@ -64,13 +71,15 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 
     dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
-    attrs = [zeros(Float64,dim2) for _ in 1:Threads.nthreads()]
+    attrs = [Float64[] for _ in 1:Threads.nthreads()]
     Threads.@threads for i in 1:dim1
         attr = attrs[Threads.threadid()]
         fill!(attr, 0.0)
         for j in 1:dim2
-            attr[j] = getfield(OSMToolset.attractiveness(
-                attractivenessSpatIndex,points_matrix[i,j]),attribute)
+            if points_matrix[i,j] != LLA(0,0,0)
+                push!(attr,getfield(OSMToolset.attractiveness(
+                    attractivenessSpatIndex,points_matrix[i,j]),attribute))
+            end
         end
         attract[i] = mean(attr)
     end
@@ -85,7 +94,7 @@ end
 
 function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
                                 points_in_sector, distance_to_analyse,csv, center_dict,
-                                list_of_attributes)
+                                list_of_attributes,city_boundries)
 
     dfs = []
     centers = []
@@ -113,7 +122,9 @@ function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
         push!(centers,city_center)
         push!(ixs,AttractivenessSpatIndex(dfs[index],get_range=a->distance_to_analyse))
         push!(points,generate_sectors(num_of_sectors,distance_for_sector,
-                                                            city_center,points_in_sector))
+                                                            city_center,points_in_sector,
+                                                                city_boundries[index][1],
+                                                                city_boundries[index][2]))
 
         for attribute in list_of_attributes
             attr = calculate_attractiveness_of_sector(points[index],ixs[index], attribute)
@@ -130,4 +141,8 @@ function calculate_bounds(poi_df::DataFrame)
     max_lon = maximum(poi_df[poi_df.value .!= "stop_position","lon"])
     min_lon = minimum(poi_df[poi_df.value .!= "stop_position","lon"])
     return min_lat,min_lon,max_lat,max_lon
+end
+
+function check_if_inside(city_boundries, point)
+    return isinside(point,city_boundries; allowonedge=true)
 end
