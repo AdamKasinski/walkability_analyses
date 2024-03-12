@@ -5,25 +5,25 @@ using Luxor
 
 # TODO jest balagan z kolejnoscia importow bo jupyter notebook tez importuje prepare_data.jl
 # W kodzie trzeba miec porzadek bo inaczej ciezko goutrzymac i aktualizwoac
-
-include("prepare_data.jl")
+# Rysunki w Plots i folium?
 
 """
-generate n sectors
+generate n sectors inside the city
 
 - 'distance'::Int - numer of sector to generate
 - 'size_of_sector'::Int - radius of each sector
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
+- 'city_boundaries_lat'::Vector{Float64 - latitudes of the city boundaries
+- 'city_boundaries_lon'::Vector{Float64} - longitudes of the city boundaries
 """
-
 function generate_sectors(num_of_sectors::Int,distance::Int,centre::LLA,num_of_points::Int,
-                    city_boundries_lat::Vector{Float64},city_boundries_lon::Vector{Float64})
-    city_boundries = Luxor.Point.(city_boundries_lat,city_boundries_lon)
+                    city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64})
+    city_boundaries = Luxor.Point.(city_boundaries_lat,city_boundaries_lon)
     sectors = Array{LLA,2}(undef,num_of_sectors,num_of_points)
     for sector in 1:num_of_sectors
         sectors[sector,:] = generate_points_in_sector(distance*sector,centre,num_of_points,
-                                                                    city_boundries)
+                                                                    city_boundaries)
     end
     return sectors
 end
@@ -34,11 +34,12 @@ generate n points around the center at a distance
 - 'distance'::Int - distance at which points will be generated
 - 'centre'::LLA - centre of the circle
 - 'num_of_points'::Int - number of points to generate
+- 'city_boundaries'::Vector{Luxor.Point} - boundaries of the city
 """
-
-function generate_points_in_sector(distance::Int,centre::LLA,num_of_points::Int,city_boundries)
+function generate_points_in_sector(distance::Int,centre::LLA,num_of_points::Int,
+                                                city_boundaries::Vector{Luxor.Point})
     radian::Float64 = 360/num_of_points*π/180
-    points = [find_point_at_distance(distance, centre, point * radian, city_boundries)
+    points = [find_point_at_distance(distance, centre, point * radian, city_boundaries)
                                             for point in 1:num_of_points]
     return points
 end
@@ -46,14 +47,19 @@ end
 
 """
 generate a point at a distance n from the center
+
+- 'radius'::Int - distance at which points will be generated
+- 'centre'::LLA - centre of the circle
+- 'radian'::Float64 - specifies the degree interval at which points should be generated 
+- 'city_boundaries'::Vector{Luxor.Point} - boundaries of the city
 """
-function find_point_at_distance(radius::Int,centre::LLA, radian::Float64,city_boundries)
+function find_point_at_distance(radius::Int,centre::LLA, radian::Float64,city_boundaries)
     point = LLA(ENU(radius*cos(radian),radius*sin(radian),0),centre)
     pt = Luxor.Point(point.lat, point.lon)
-    if check_if_inside(city_boundries,pt)
+    if check_if_inside(city_boundaries,pt)
         return point
     end
-    return LLA(0,0,0)
+    return LLA(0.0,0.0,0.0)
 end
 
 """
@@ -65,7 +71,6 @@ end
 if generate_sectors function used, there is no need to use the function - attractiveness of
 each point is already generated
 """
-
 function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex,
                                                                 attribute::Symbol)
 
@@ -86,15 +91,37 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
     return attract
 end
 
+"""
+The function transforms a vector using min_max
+
+- 'vec'::Vector{Float64} - vector which should be transformed
+"""
 function min_max_scaling(vec::Vector{Float64})
     mins = minimum(vec)
     maxs = maximum(vec)
     (vec.-mins)/(maxs-mins)
 end
 
-function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
-                                points_in_sector, distance_to_analyse,csv, center_dict,
-                                list_of_attributes,city_boundries)
+"""
+the function is currently being modified
+
+determines the attractiveness of several cities based on specified attributes
+
+- 'list_of_cities'::Vector{String} - list of cities
+- 'num_of_sectors'::Int - number of sectors
+- 'distance_for_sector'::Int - radius of each sector
+- 'points_in_sector'::Int - number of points in each sector
+- 'distance_to_analyse'::Int - search area radius
+- 'csv'::Bool - a flag indicating whether POI should be taken from a CSV file or OSM
+- 'center_dict'::Dict{String,LLA} - dictionary with centers of the cities
+- 'list_of_attributes'::Vector{String} - vector of attributes based on which attractiveness will be determined
+- 'city_boundaries::Dict{String,Vector{Luxor.Point}} - boundaries of the cities
+"""
+
+function comparison(list_of_cities::Vector{String},num_of_sectors::Int,distance_for_sector::Int,
+                                points_in_sector::Int, distance_to_analyse::Int,csv::Bool, 
+                                center_dict::Dict{String,LLA},list_of_attributes::Vector{String},
+                                city_boundaries::Dict{String,Vector{Luxor.Point}})
 
     dfs = []
     centers = []
@@ -123,8 +150,8 @@ function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
         push!(ixs,AttractivenessSpatIndex(dfs[index],get_range=a->distance_to_analyse))
         push!(points,generate_sectors(num_of_sectors,distance_for_sector,
                                                             city_center,points_in_sector,
-                                                                city_boundries[index][1],
-                                                                city_boundries[index][2]))
+                                                                city_boundaries[index][1],
+                                                                city_boundaries[index][2]))
 
         for attribute in list_of_attributes
             attr = calculate_attractiveness_of_sector(points[index],ixs[index], attribute)
@@ -135,14 +162,12 @@ function create_comparison(list_of_cities,num_of_sectors,distance_for_sector,
 end
 
 
-function calculate_bounds(poi_df::DataFrame)
-    max_lat = maximum(poi_df[poi_df.value .!= "stop_position","lat"])
-    min_lat = minimum(poi_df[poi_df.value .!= "stop_position","lat"])
-    max_lon = maximum(poi_df[poi_df.value .!= "stop_position","lon"])
-    min_lon = minimum(poi_df[poi_df.value .!= "stop_position","lon"])
-    return min_lat,min_lon,max_lat,max_lon
-end
+"""
+Determines whether a point lies within the city boundaries
 
-function check_if_inside(city_boundries, point)
-    return isinside(point,city_boundries; allowonedge=true)
+- 'city_boundaries'::Vector{Luxor.Point} - boundaries of the city
+- 'point'::Luxor.Point - the examined point
+"""
+function check_if_inside(city_boundaries::Vector{Luxor.Point}, point::Luxor.Point)
+    return isinside(point,city_boundaries; allowonedge=true)
 end

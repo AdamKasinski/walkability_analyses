@@ -12,7 +12,12 @@ using DataFrames
 using Statistics
 # TODO jest balagan z bibliotekami, tu jest uzywane readxml a nie jest importowane (dodalem import)
 
+""" 
+Retrieves the area defined by the outermost vertices of the specified city.
 
+- 'city'::String: The name of the city for which to download the boundary.
+- 'admin_level'::String: The administrative level of the area being searched.
+"""
 function download_city_with_bounds(city::String, admin_level::String)
     if isfile("$city.osm")
         return "The file is already downloaded"
@@ -24,21 +29,15 @@ function download_city_with_bounds(city::String, admin_level::String)
     max_lat = bounds["maxlat"]
     f = Downloads.download("https://overpass-api.de/api/map?bbox=$min_lon,$min_lat,$max_lon,$max_lat")
     mv(f, "$city.osm")
+    return "$city.osm"
 end
 
+""" 
+Downloads the relation ID of a specified city.
 
+- 'city'::String: The name of the city for which to download the relation ID.
+- 'admin_level'::String: The administrative level of the area being searched.
 """
-method needs to be revised
-"""
-function __download_data_api(city::String,admin_level = "8")
-    if isfile(string(city,".osm"))
-        return "The file is already downloaded"
-    end
-    relation_id = get_relation_id(city,admin_level)
-    download_data_relation(city,relation_id)
-    return get_city_bounds(city,admin_level)
-end
-
 function get_relation_id(city_name::String, admin_level::String)
     query = """
     [out:json];
@@ -58,36 +57,12 @@ function get_relation_id(city_name::String, admin_level::String)
     end
   end
 
-  """
-  because of the recursion the function currently downloads points
-outside the city
-  """
-function __download_data_relation(city_name::String,relation_id::Int)
-    f = 3600000000 + relation_id
-    query = """
-        [out:xml];
-        area($f)->.searchArea;
-        (
-        node(area.searchArea);
-        way(area.searchArea);
-        relation(area.searchArea);
-        );
-        (._; >;);
-        out meta;
-    """
+""" 
+Downloads the boundaries of a specified city.
 
-    overpass_url = "http://overpass-api.de/api/interpreter/"
-    response = HTTP.post(overpass_url, body = query)
-
-    if response.status == 200
-        open(string(city_name,".osm"), "w") do file
-            write(file, String(response.body))
-        end
-    else
-        println("Failed to download OSM data")
-    end
-end
-
+- 'city'::String: The name of the city for which to download boundaries.
+- 'admin_level'::String: The administrative level of the area being searched.
+"""
 function get_city_bounds(city_name::String,level::String)
     query = """
     [out:json];
@@ -102,7 +77,12 @@ function get_city_bounds(city_name::String,level::String)
     return j["elements"][1]["bounds"]
 end
 
-function download_data(city::String)
+
+"""
+Downloads the map of a specified city from BBBike.
+- 'city'::String: The name of the city for which to download the map.
+"""
+function download_data_from_bbbike(city::String)
     if isfile(string(city,".osm"))
         return "The file is already downloaded"
     else
@@ -123,16 +103,34 @@ function download_data(city::String)
     end
 end
 
+"""
+Creates a map from an OSM file.
+
+- 'file'::String: The name of the file used to create the map.
+"""
 function create_map(file::String)
     return get_map_data(file,use_cache = false)
 end
 
-function save_asm(file::DataFrame,save_as::String)
+"""
+Saves points of interest (POI) from a DataFrame to a CSV file.
+
+- 'df'::DataFrame: The DataFrame containing the data to be saved.
+- 'save_as'::String: The name of the CSV file where the data will be saved.
+"""
+function save_asm(df::DataFrame,save_as::String)
     if save_as != ""
-        CSV.write(save_as,file)
+        CSV.write(save_as,df)
     end
 end
 
+"""
+Creates a Points of Interest (POI) file based on an OSM file.
+
+- 'file'::String: The name of the OSM file to process.
+- 'scrape_config': The configuration file specifying how to extract POIs.
+- 'save_as'::String: The name of the CSV file where the POI table will be saved.
+"""
 function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     if endswith(file,"osm")
         if isnothing(scrape_config)
@@ -146,10 +144,14 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
     end
 end
 
-# TODO to zwraca plik a nie punkty. Zaktualizowac nazwe fukcji
-function get_boundries_points(city::String)
+"""
+Downloads an OSM file containing the boundaries of a specified city.
 
-    if isfile(string(city,"_boundries.osm"))
+- 'city'::String: The name of the city for which the OSM file is downloaded.
+"""
+function download_boundaries_file(city::String)
+
+    if isfile(string(city,"_boundaries.osm"))
         return "The file is already downloaded"
     end
     query = """
@@ -167,55 +169,25 @@ function get_boundries_points(city::String)
     response = HTTP.post(url,body=query)
 
     if response.status == 200
-        open(string(city,"_boundries.osm"), "w") do file
+        open(string(city,"_boundaries.osm"), "w") do file
             write(file, String(response.body))
         end
     else
-        println("Failed to download $city boundries data")
+        println("Failed to download $city boundaries data")
     end
-    #TODO zwrocic nazwe pliku
+    return string(city,"_boundaries.osm")
 end
 
-# TODO: argumentem powinna byc nazwa pliku a nie miasto
-function extract_points(city)
-    osm_file = readxml("$(city)_boundries.osm")
-    nodes_bounds = Dict{String, Tuple{Float64,Float64}}()
-    ways_refs = Dict{String, Vector{String}}()
-    way_order = String[]
+"""
+Extracts city boundaries from an OSM file in ENU format.
 
-    for member in findall("//member", osm_file)
-        if member["type"] == "way" && member["role"] == "outer"
-            push!(way_order,member["ref"])
-        end
-    end
-
-    for way in findall("//way", osm_file)
-        id = way["id"]
-        ways_refs[id] = [nd["ref"] for nd in findall("nd",way)]
-    end
-
-    for node in findall("//node", osm_file)
-        id = node["id"]
-        lat = parse(Float64, node["lat"])
-        lon = parse(Float64, node["lon"])
-        point = (lat,lon)
-        nodes_bounds[id] = point
-    end
-
-    order_ways = vcat([ways_refs[key] for key in way_order
-                                    if haskey(ways_refs,key)]...)
-
-    ordered_values = [nodes_bounds[key] for key in order_ways if
-                    haskey(nodes_bounds, key)]
-    return ordered_values
-end
-
-
-
-function extract_points2(filename)
+- 'filename'::String: The name of the file containing the boundaries.
+"""
+function extract_points_ENU(filename::String)
     osm_file = readxml(filename)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
-    nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
+    nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),
+                    lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
     #punkt referencyjny dla mapy, potem zrobic jako tez mozliwy parametr
     reflla = LLA(mean(nodes.lat),mean(nodes.lon),0.0)
     idtoENU = Dict{Int,ENU}(nodes.id .=> ENU.(LLA.(nodes.lat,nodes.lon,0.0),Ref(reflla)))
@@ -240,8 +212,44 @@ function extract_points2(filename)
     res
 end
 
+"""
+Extracts city boundaries from an OSM file in LLA format.
+
+- 'filename'::String: The name of the file containing the boundaries.
+"""
+
+function extract_points_LLA(filename::String)
+    osm_file = readxml(filename)
+    #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
+    nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),
+                    lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
+    #punkt referencyjny dla mapy, potem zrobic jako tez mozliwy parametr
+    reflla = LLA(mean(nodes.lat),mean(nodes.lon),0.0)
+    idtoLLA = Dict{Int,LLA}(nodes.id .=> LLA.(nodes.lat,nodes.lon,0.0))
+
+    ways_refs = Dict{Int, Vector{Int}}()
+    # find all tags <way ...>...</way>
+    for way in findall("//way", osm_file)
+        id = parse(Int, way["id"])
+        ways_refs[id] = [parse(Int, nd["ref"]) for nd in findall("nd",way)]
+    end
+
+    rela = findall("//relation[tag[@k='boundary' and @v='administrative']]", osm_file)[1]
+
+    # find all tags member in the rela with <member type="way" role="outer"/>
+    res = DataFrame()
+    adminname = findall("tag[@k='name']", rela)[1]["v"]
+    for member in findall("member[@type='way' and @role='outer']", rela)
+        wayid = parse(Int, member["ref"])
+        nodes = ways_refs[wayid]
+        append!(res,DataFrame(adminname=adminname, wayid=wayid, nodes=nodes, x=getX.(getindex.(Ref(idtoLLA),nodes)), y=getY.(getindex.(Ref(idtoLLA),nodes) )))
+    end
+    res
+end
+
+
 #using Plots
-#res = extract_points2("Kraków_boundries.osm")
+#res = extract_points2("Kraków_boundaries.osm")
 #plot(res.x,res.y,group=res.wayid,seriestype=:line,legend=false, markerbordercolor=nothing, markersize=2, markerstrokewidth=0)
 #savefig("krakow_boundary.pdf")
 
