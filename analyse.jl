@@ -92,6 +92,32 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 end
 
 """
+- 'points'::Array{LLA,2} - matrix with LLA points
+- 'attractivenessSpatIndex'::attractivenessSpatIndex
+- 'attribute'::Symbol - The category that will be used to calculate attractiveness
+                        (:education, :entertainment, :healthcare, :leisure, :parking,
+                        :restaurants, :shopping, :transport)
+if generate_sectors function used, there is no need to use the function - attractiveness of
+each point is already generated
+"""
+function calculate_attractiveness_of_points(points_matrix,attractivenessSpatIndex,
+                                                                attribute::Symbol)
+
+    dim1, dim2 = size(points_matrix)
+    attr_matrix = zeros(Float64,dim1,dim2)
+    for i in 1:dim1
+        for j in 1:dim2
+            if points_matrix[i,j] != LLA(0,0,0)
+                attr_matrix[i,j] = getfield(OSMToolset.attractiveness(
+                    attractivenessSpatIndex,points_matrix[i,j]),attribute)
+            end
+        end
+    end
+    return attr_matrix
+end
+
+
+"""
 The function transforms a vector using min_max
 
 - 'vec'::Vector{Float64} - vector which should be transformed
@@ -117,6 +143,35 @@ determines the attractiveness of several cities based on specified attributes
 - 'list_of_attributes'::Vector{String} - vector of attributes based on which attractiveness will be determined
 - 'city_boundaries::Dict{String,Vector{Luxor.Point}} - boundaries of the cities
 """
+
+
+function calculate_attractiveness_for_city(city_name::String, admin_level::String, search_area::Int,
+                                    num_of_sectors::Int,distance::Int,num_of_points::Int,
+                                    attractiveness_of_sector::Bool,centre::LLA,attr)
+    
+    download_city_with_bounds(city_name,admin_level)
+
+    if isfile("$city_name.csv")
+        df_city = get_POI("$city_name.csv")
+    else
+        df_city = get_POI("$city_name.osm",nothing,"$city_name.csv")
+    end
+
+    download_boundaries_file("$city_name")
+
+    city_boundaries = extract_points_LLA(string(city_name,"_boundaries.osm"))
+    ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
+    city_points = generate_sectors(num_of_sectors,distance,centre,num_of_points,
+                                    city_boundaries.y,city_boundaries.x)
+    if attractiveness_of_sector
+        attr_city = calculate_attractiveness_for_sector(city_points,ix_city,attr)
+        return min_max_scaling(attr_city)
+    end
+
+    return city_points, calculate_attractiveness_of_points(city_points,ix_city,attr)
+
+end
+
 
 function comparison(list_of_cities::Vector{String},num_of_sectors::Int,distance_for_sector::Int,
                                 points_in_sector::Int, distance_to_analyse::Int,csv::Bool, 
