@@ -19,10 +19,12 @@ function plot_heatmap(city_centre, city_points, attractiveness_points,
 
     for sector in 1:size(points_cracow)[1]
         for point in 1:size(points_cracow)[2]
-            lt = points_cracow[sector,point].lat
-            ln = points_cracow[sector,point].lon
+            lla = LLA(points_cracow[sector,point],center_cracow) 
+            lt = lla.lat
+            ln = lla.lon
             flm.Circle([lt,ln],popup=sector, radius =5,
                         color=linear(cracow_attr_matrix[sector,point])).add_to(map_plot)
+    
         end
     end
 
