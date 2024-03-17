@@ -7,26 +7,25 @@ using Plots
 folium = pyimport("folium")
 cm = pyimport("branca.colormap")
 
-function plot_heatmap(city_centre, city_points, attractiveness_points,
-                        zoom_start = 14, control_scale = false)
+function plot_heatmap(city_points, attr_points,boundaries)
     
-    min_attr = minimum(attractiveness_points)
-    max_attr = maximum(attractiveness_points)
+    north = [i.north for i in city_points]
+    east = [i.east for i in city_points]
 
-    linear = cm.LinearColormap(["red", "yellow", "green"], 
-                                            vmin=min_attr, 
-                                            vmax=max_attr)
+    figure = Plots.scatter(east,north,zcolor = attr_points,legend=false,colorbar=true,
+    aspect_ratio=:equal)
 
-    for sector in 1:size(points_cracow)[1]
-        for point in 1:size(points_cracow)[2]
-            lla = LLA(points_cracow[sector,point],center_cracow) 
-            lt = lla.lat
-            ln = lla.lon
-            flm.Circle([lt,ln],popup=sector, radius =5,
-                        color=linear(cracow_attr_matrix[sector,point])).add_to(map_plot)
-    
-        end
+    grouped_ways = groupby(boundaries, :wayid)
+    for (key, way) in pairs(grouped_ways)
+        Plots.plot!(figure, way.x, way.y, label="wayid $(key)", 
+                                        line=:path,legend=false,linecolor=:red,
+                                        linewidth=2)
     end
+    Plots.display(figure)
+end
 
-
+function plot_attractiveness_of_sectors_abs(num_of_sectors,distance_between_sectors,
+                                                cities_attr,labels,plotconfig)
+    x_axis = [i*distance for i in 1:num_of_sectors]./1000
+    Plots.plot(x_axis,cities_attr, labels = labels; plotconfig...)
 end

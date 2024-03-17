@@ -247,9 +247,12 @@ function extract_points_LLA(filename::String)
     res
 end
 
-
-#using Plots
-#res = extract_points2("Kraków_boundaries.osm")
-#plot(res.x,res.y,group=res.wayid,seriestype=:line,legend=false, markerbordercolor=nothing, markersize=2, markerstrokewidth=0)
-#savefig("krakow_boundary.pdf")
+function get_city_centre(boundaries_file::String)
+    osm_file = readxml(boundaries_file)
+    centre_ref = findfirst("//relation/member[@type='node' and @role='admin_centre']",osm_file)["ref"]
+    centre_node = findfirst("//node[@id='$centre_ref']",osm_file)
+    lat = parse(Float64, centre_node["lat"])
+    lon = parse(Float64, centre_node["lon"])
+    return LLA(lat,lon,0)
+end
 
