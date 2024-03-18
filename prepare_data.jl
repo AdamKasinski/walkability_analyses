@@ -149,7 +149,7 @@ Downloads an OSM file containing the boundaries of a specified city.
 
 - 'city'::String: The name of the city for which the OSM file is downloaded.
 """
-function download_boundaries_file(city::String)
+function download_boundaries_file(city::String,admin_level::String)
 
     if isfile(string(city,"_boundaries.osm"))
         return "The file is already downloaded"
@@ -158,7 +158,7 @@ function download_boundaries_file(city::String)
         [out:xml];
         area[name="$city"]->.searchArea;
         (
-        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="8"]["name"="$city"];
+        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="$admin_level"]["name"="$city"];
         );
         out body;
         >;
