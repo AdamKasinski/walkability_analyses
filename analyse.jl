@@ -3,17 +3,16 @@ using OSMToolset
 using Statistics
 using Luxor
 include("prepare_data.jl")
-"""
-generate n sectors inside the city
 
-- 'distance'::Int - numer of sector to generate
-- 'size_of_sector'::Int - radius of each sector
+"""
+The function generates 100 sectors evenly spaced apart
+
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
 - 'city_boundaries_lat'::Vector{Float64 - latitudes of the city boundaries
 - 'city_boundaries_lon'::Vector{Float64} - longitudes of the city boundaries
+- 'rectangle_bounds'::Dict{String, Any} - the furthest points of the city
 """
-
 function generate_sectors(centre::LLA,num_of_points::Int,
     city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64},
                                                                     rectangle_bounds)
@@ -31,7 +30,16 @@ function generate_sectors(centre::LLA,num_of_points::Int,
     return sectors
 end
 
+"""
+The function generate n sectors inside the city
 
+- 'distance'::Int - numer of sector to generate
+- 'size_of_sector'::Int - radius of each sector
+- 'centre'::LLA - centre of the map
+- 'num_of_points'::Int - number of points to generate in each sector
+- 'city_boundaries_lat'::Vector{Float64 - latitudes of the city boundaries
+- 'city_boundaries_lon'::Vector{Float64} - longitudes of the city boundaries
+"""
 function generate_sectors(num_of_sectors::Int,distance::Float64,centre::LLA,num_of_points::Int,
                     city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64})
     
@@ -45,7 +53,7 @@ function generate_sectors(num_of_sectors::Int,distance::Float64,centre::LLA,num_
 end
 
 """
-generate n points around the center at a distance
+The function generates n points around the center at a distance
 
 - 'distance'::Int - distance at which points will be generated
 - 'centre'::LLA - centre of the circle
@@ -62,7 +70,7 @@ end
 
 
 """
-generate a point at a distance n from the center
+The function generates a point at a distance n from the center
 
 - 'radius'::Int - distance at which points will be generated
 - 'centre'::LLA - centre of the circle
@@ -109,6 +117,8 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 end
 
 """
+The function calculates attractiveness of points
+
 - 'points'::Array{LLA,2} - matrix with LLA points
 - 'attractivenessSpatIndex'::attractivenessSpatIndex
 - 'attribute'::Symbol - The category that will be used to calculate attractiveness
@@ -147,24 +157,25 @@ function min_max_scaling(vec::Vector{Float64})
 end
 
 """
-the function is currently being modified
+The function generates points within a city boundaries and calculates attractiveness of 
+each point. If num_of_sectors and distance parameters have default values, the functions 
+generates 100 sectors evenly spaced apart.
 
-determines the attractiveness of several cities based on specified attributes
-
-- 'list_of_cities'::Vector{String} - list of cities
-- 'num_of_sectors'::Int - number of sectors
-- 'distance_for_sector'::Int - radius of each sector
-- 'points_in_sector'::Int - number of points in each sector
-- 'distance_to_analyse'::Int - search area radius
-- 'csv'::Bool - a flag indicating whether POI should be taken from a CSV file or OSM
-- 'center_dict'::Dict{String,LLA} - dictionary with centers of the cities
-- 'list_of_attributes'::Vector{String} - vector of attributes based on which attractiveness will be determined
-- 'city_boundaries::Dict{String,Vector{Luxor.Point}} - boundaries of the cities
+- 'city_name'::String - name of the city
+- 'admin_level'::String - level at which city will be analysed
+- 'search_area'::Int - the radius of the area in which objects will be searched
+- 'num_of_points'::Int - number of points in each sector
+- 'attr'::Symbol - The category that will be used to calculate attractiveness
+                    (:education, :entertainment, :healthcare, :leisure, :parking,
+                    :restaurants, :shopping, :transport)
+- 'num_of_sectors' - number of sectors
+- 'distance' - distance between sectors
 """
 
-
-function calculate_attractiveness_for_city_points(city_name::String, admin_level::String, search_area::Int,
-                                    num_of_sectors::Int,distance::Int,num_of_points::Int,attr)
+function calculate_attractiveness_of_city_points(city_name::String, admin_level::String, 
+                                                search_area::Int,num_of_points::Int,
+                                                attr::Symbol,num_of_sectors=nothing,
+                                                distance=nothing)
     
     download_city_with_bounds(city_name,admin_level)
 
@@ -174,22 +185,49 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
         df_city = get_POI("$city_name.osm",nothing,"$city_name.csv")
     end
 
-    download_boundaries_file("$city_name")
+    download_boundaries_file(city_name,admin_level)
     boundaries_file = string(city_name,"_boundaries.osm")
     city_boundaries = extract_points_ENU(boundaries_file)
 
     city_centre = get_city_centre(boundaries_file)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
-    city_points = generate_sectors(num_of_sectors,distance,city_centre,num_of_points,
-                                    city_boundaries.x,city_boundaries.y)
+
+    if num_of_sectors === nothing
+
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+        city_points = generate_sectors(city_centre,num_of_points,city_boundaries.x,
+                            city_boundaries.y,rectangle_boundaries)
+
+    else
+
+        city_points = generate_sectors(num_of_sectors,distance,city_centre,num_of_points,
+                                        city_boundaries.x,city_boundaries.y)
+
+    end
 
     return city_points, 
             calculate_attractiveness_of_points(city_points,ix_city,attr,city_centre),
             city_boundaries
 end
 
-function calculate_attractiveness_for_city_sectors(city_name::String, admin_level::String, search_area::Int,
-    num_of_sectors::Int,distance::Int,num_of_points::Int,attr)
+"""
+The function generates points within a city boundaries and calculates average attractiveness 
+for each sector. If num_of_sectors and distance parameters have default values, the functions 
+generates 100 sectors evenly spaced apart
+
+- 'city_name'::String - name of the city
+- 'admin_level'::String - level at which city will be analysed
+- 'search_area'::Int - the radius of the area in which objects will be searched
+- 'num_of_points'::Int - number of points in each sector
+- 'attr'::Symbol - The category that will be used to calculate attractiveness
+                    (:education, :entertainment, :healthcare, :leisure, :parking,
+                    :restaurants, :shopping, :transport)
+- 'num_of_sectors' - number of sectors
+- 'distance' - distance between sectors
+"""
+
+function calculate_attractiveness_of_city_sectors(city_name::String, admin_level::String, search_area::Int,
+    num_of_points::Int,attr,distance=nothing,num_of_sectors=nothing)
 
     download_city_with_bounds(city_name,admin_level)
 
@@ -199,24 +237,33 @@ function calculate_attractiveness_for_city_sectors(city_name::String, admin_leve
         df_city = get_POI("$city_name.osm",nothing,"$city_name.csv")
     end
 
-    download_boundaries_file("$city_name")
+    download_boundaries_file(city_name,admin_level)
     boundaries_file = string(city_name,"_boundaries.osm")
     city_boundaries = extract_points_ENU(boundaries_file)
 
-    city_centre = get_city_cetre(boundaries_file)
+    city_centre = get_city_centre(boundaries_file)
 
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
-    city_points = generate_sectors(num_of_sectors,distance,centre,num_of_points,
-        city_boundaries.x,city_boundaries.y)
+    
+    if num_of_sectors === nothing
 
-    attr_city = calculate_attractiveness_for_sector(city_points,ix_city,attr,city_centre)
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+        city_points = generate_sectors(city_centre,num_of_points,city_boundaries.x,
+                            city_boundaries.y,rectangle_boundaries)
+
+    else
+
+        city_points = generate_sectors(num_of_sectors,distance,city_centre,num_of_points,
+                                        city_boundaries.x,city_boundaries.y)
+                                        
+    end
+
+    attr_city = calculate_attractiveness_of_sector(city_points,ix_city,attr,city_centre)
     return min_max_scaling(attr_city)
 end
 
-
-
 """
-Determines whether a point lies within the city boundaries
+The function determines whether a point lies within the city boundaries
 
 - 'city_boundaries'::Vector{Luxor.Point} - boundaries of the city
 - 'point'::Luxor.Point - the examined point

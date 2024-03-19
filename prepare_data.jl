@@ -203,7 +203,7 @@ function extract_points_ENU(filename::String)
 
     # find all tags member in the rela with <member type="way" role="outer"/>
     res = DataFrame()
-    adminname = findall("tag[@k='name:en']", rela)[1]["v"]
+    adminname = findall("tag[@k='name']", rela)[1]["v"]
     for member in findall("member[@type='way' and @role='outer']", rela)
         wayid = parse(Int, member["ref"])
         nodes = ways_refs[wayid]
