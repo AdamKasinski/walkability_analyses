@@ -109,7 +109,7 @@ Creates a map from an OSM file.
 - 'file'::String: The name of the file used to create the map.
 """
 function create_map(file::String)
-    return get_map_data(file,use_cache = false)
+    return get_map_data(file,use_cache = true)
 end
 
 """
@@ -183,13 +183,13 @@ Extracts city boundaries from an OSM file in ENU format.
 
 - 'filename'::String: The name of the file containing the boundaries.
 """
-function extract_points_ENU(filename::String)
+function extract_points_ENU(filename::String,centre)
     osm_file = readxml(filename)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
     nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),
                     lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
     #punkt referencyjny dla mapy, potem zrobic jako tez mozliwy parametr
-    reflla = LLA(mean(nodes.lat),mean(nodes.lon),0.0)
+    reflla = centre
     idtoENU = Dict{Int,ENU}(nodes.id .=> ENU.(LLA.(nodes.lat,nodes.lon,0.0),Ref(reflla)))
 
     ways_refs = Dict{Int, Vector{Int}}()
@@ -218,13 +218,13 @@ Extracts city boundaries from an OSM file in LLA format.
 - 'filename'::String: The name of the file containing the boundaries.
 """
 
-function extract_points_LLA(filename::String)
+function extract_points_LLA(filename::String, centre)
     osm_file = readxml(filename)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
     nodes = DataFrame((;id=parse(Int, node["id"]), lat=parse(Float64, node["lat"]),
                     lon=parse(Float64, node["lon"] ))  for node in findall("//node", osm_file))
     #punkt referencyjny dla mapy, potem zrobic jako tez mozliwy parametr
-    reflla = LLA(mean(nodes.lat),mean(nodes.lon),0.0)
+    reflla = centre #LLA(mean(nodes.lat),mean(nodes.lon),0.0)
     idtoLLA = Dict{Int,LLA}(nodes.id .=> LLA.(nodes.lat,nodes.lon,0.0))
 
     ways_refs = Dict{Int, Vector{Int}}()
