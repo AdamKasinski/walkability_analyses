@@ -222,7 +222,8 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
     end
 
     return city_points, 
-            min_max_scaling(calculate_attractiveness_of_points(
+            min_max_scaling(
+            calculate_attractiveness_of_points(
                 city_points,ix_city,attr,city_centre)),
             city_boundaries
 end
