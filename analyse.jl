@@ -221,12 +221,21 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
 
     end
 
-    return city_points, 
-            min_max_scaling(
-            calculate_attractiveness_of_points(
-                city_points,ix_city,attr,city_centre)),
+    return city_points,
+            to_zero.(
+                    log.(calculate_attractiveness_of_points(city_points,
+                                                ix_city,attr,city_centre)
+            )),
             city_boundaries
 end
+
+function to_zero(elem)
+    if elem == Inf || elem < 0 
+        return 0
+    end
+    return elem
+end
+
 
 """
 The function generates points within a city boundaries and calculates average attractiveness 

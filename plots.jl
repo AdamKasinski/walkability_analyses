@@ -21,8 +21,7 @@ function plot_heatmap(city_points, attr_points,boundaries,
                     " search area: ", search_area,"\n",
                     " wilderness_distance: ", wilderness_distance,"\n"),
                     titlefontsize=10,
-                    fmt = :svg,
-                    zscale = :log10)
+                    fmt = :svg)
 
     grouped_ways = DataFrames.groupby(boundaries, :wayid)
     for (key, way) in pairs(grouped_ways)
