@@ -15,6 +15,8 @@ function plot_heatmap(city_points, attr_points,boundaries,
     east = [i.east for i in city_points]
     figure = Plots.scatter(east,north,zcolor = attr_points,legend=false,
                     colorbar=true, aspect_ratio=:equal, color = :oslo,
+                    markerstrokealpha=0,markershape=:rect,
+                    markersize = 2,
                     title = string("city: ", city,
                     " attribute: ", attribute,"\n",
                     " points_in_sector: ", points_in_sector,"\n",

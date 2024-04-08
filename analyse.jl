@@ -10,14 +10,14 @@ The function generates 100 sectors evenly spaced apart
 
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
-- 'city_boundaries_lat'::Vector{Float64 - latitudes of the city boundaries
-- 'city_boundaries_lon'::Vector{Float64} - longitudes of the city boundaries
+- 'city_boundaries_north'::Vector{Float64 - latitudes of the city boundaries
+- 'city_boundaries_east'::Vector{Float64} - longitudes of the city boundaries
 - 'rectangle_bounds'::Dict{String, Any} - the furthest points of the city
 """
 function generate_sectors(centre::LLA,
                         num_of_points::Int,
-                        city_boundaries_lat::Vector{Float64},
-                        city_boundaries_lon::Vector{Float64},
+                        city_boundaries_east::Vector{Float64},
+                        city_boundaries_north::Vector{Float64},
                         rectangle_bounds, 
                         tree)
 
@@ -26,7 +26,7 @@ function generate_sectors(centre::LLA,
     dist_min = OpenStreetMapX.distance(min,ENU(0,0,0))
     dist_max = OpenStreetMapX.distance(max,ENU(0,0,0))
     distance = maximum([dist_min,dist_max])/100
-    city_boundaries = Luxor.Point.(city_boundaries_lat,city_boundaries_lon)
+    city_boundaries = Luxor.Point.(city_boundaries_east,city_boundaries_north)
     sectors = Array{ENU,2}(undef,100,num_of_points)
     for sector in 1:100
     sectors[sector,:] = generate_points_in_sector(distance*sector,num_of_points,
@@ -42,17 +42,18 @@ The function generate n sectors inside the city
 - 'size_of_sector'::Int - radius of each sector
 - 'centre'::LLA - centre of the map
 - 'num_of_points'::Int - number of points to generate in each sector
-- 'city_boundaries_lat'::Vector{Float64 - latitudes of the city boundaries
-- 'city_boundaries_lon'::Vector{Float64} - longitudes of the city boundaries
+- 'city_boundaries_north'::Vector{Float64 - latitudes of the city boundaries
+- 'city_boundaries_east'::Vector{Float64} - longitudes of the city boundaries
 """
 function generate_sectors(num_of_sectors::Int,distance::Float64,num_of_points::Int,
-            city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64},tree)
+                        city_boundaries_east::Vector{Float64},
+                        city_boundaries_north::Vector{Float64},tree)
     
-    city_boundaries = Luxor.Point.(city_boundaries_lat,city_boundaries_lon)
+    city_boundaries = Luxor.Point.(city_boundaries_east,city_boundaries_north)
     sectors = Array{ENU,2}(undef,num_of_sectors,num_of_points)
     for sector in 1:num_of_sectors
         sectors[sector,:] = generate_points_in_sector(distance*sector,num_of_points,
-                                                                    city_boundaries,tree)
+                                                                city_boundaries,tree)
     end
     return sectors
 end
@@ -66,7 +67,7 @@ The function generates n points around the center at a distance
 - 'city_boundaries'::Vector{Luxor.Point} - boundaries of the city
 """
 function generate_points_in_sector(distance::Float64,num_of_points::Int,
-                                                city_boundaries::Vector{Luxor.Point},tree)
+                                            city_boundaries::Vector{Luxor.Point},tree)
     radian::Float64 = 360/num_of_points*π/180
     points = [find_point_at_distance(distance, point * radian, city_boundaries,tree)
                                             for point in 1:num_of_points]
@@ -87,7 +88,10 @@ function find_point_at_distance(radius::Float64, radian::Float64,city_boundaries
                                                                             tree)
     point = ENU(radius*cos(radian),radius*sin(radian),0)
     pt = Luxor.Point(point.east, point.north)
-    if check_if_in_wilderness(tree,point) && check_if_inside(city_boundaries,pt)
+    if pt == Point(13365.097862825516, -6809.857496093205)
+        a = 2
+    end
+    if check_if_inside(city_boundaries,pt) && check_if_in_wilderness(tree,point)
         return point
     end
     return ENU(Inf16,Inf16,Inf16)
@@ -135,7 +139,7 @@ if generate_sectors function used, there is no need to use the function - attrac
 each point is already generated
 """
 function calculate_attractiveness_of_points(points_matrix,attractivenessSpatIndex,
-                                                                attribute::Symbol,centre::LLA)
+                                            attribute::Symbol,centre::LLA)
 
     dim1, dim2 = size(points_matrix)
     attr_matrix = zeros(Float64,dim1,dim2)
@@ -188,7 +192,7 @@ generates 100 sectors evenly spaced apart.
 function calculate_attractiveness_for_city_points(city_name::String, admin_level::String, 
                                                 search_area::Int,num_of_points::Int,
                                                 attr::Symbol,wilderness_distance,
-                                                num_of_sectors=nothing, distance=nothing)
+                                                num_of_sectors=0, distance=0.0)
     
     download_city_with_bounds(city_name,admin_level)
 
@@ -203,12 +207,11 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
     city_map = create_map("$city_name.osm")
     city_centre = OpenStreetMapX.center(city_map.bounds)
     city_boundaries = extract_points_ENU(boundaries_file,city_centre)
-
     admin_city_centre = get_city_centre(boundaries_file)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
 
     city_tree = generate_index(wilderness_distance, city_map.nodes)
-    if num_of_sectors === nothing
+    if num_of_sectors == 0
 
         rectangle_boundaries = get_city_bounds(city_name,admin_level)
         city_points = generate_sectors(city_centre,num_of_points,city_boundaries.x,
@@ -216,10 +219,15 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
 
     else
 
-        city_points = generate_sectors(num_of_sectors,distance,city_centre,num_of_points,
-                                        city_boundaries.x,city_boundaries.y)
+        city_points = generate_sectors(num_of_sectors,distance,
+                                        num_of_points,city_boundaries.x,
+                                        city_boundaries.y,city_tree)
 
     end
+
+#    num_of_sectors::Int,distance::Float64,num_of_points::Int,
+#    city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64},tree
+
 
     return city_points,
             to_zero.(
@@ -297,6 +305,18 @@ function calculate_attractiveness_for_city_sectors(city_name::String, admin_leve
 end
 
 
+
+#function isinside(point::Point, pointlist::Array{Point,1}, epsilon::Float64;
+#                  allowonedge::Bool = false)::Bool
+#    xs = [point.x for point in boundaries]
+#    ys = [point.y for point in boundaries]
+#    epsilon = 5
+#    filtered_xs = ys[findall(x -> x > point.x, xs)]
+#    filtered_ys = findall(y -> (y < point.y+epsilon)
+#                            && (y > point.y-epsilon),filtered_xs)
+#    return 
+#end
+
 """
 The function determines whether a point lies within the city boundaries
 
@@ -304,7 +324,7 @@ The function determines whether a point lies within the city boundaries
 - 'point'::Luxor.Point - the examined point
 """
 function check_if_inside(city_boundaries::Vector{Luxor.Point}, point::Luxor.Point)
-    return isinside(point,city_boundaries; allowonedge=false)
+    return Luxor.isinside(point,city_boundaries; allowonedge=false)
 end
 
 function ENU_matrix_to_LLA_matrix(ENU_matrix,centre_point::LLA)
@@ -351,3 +371,4 @@ function check_if_in_wilderness(tree::RTree, enu::ENU)
     end
     return false 
 end
+

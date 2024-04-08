@@ -183,6 +183,7 @@ Extracts city boundaries from an OSM file in ENU format.
 
 - 'filename'::String: The name of the file containing the boundaries.
 """
+
 function extract_points_ENU(filename::String,centre)
     osm_file = readxml(filename)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
@@ -204,10 +205,29 @@ function extract_points_ENU(filename::String,centre)
     # find all tags member in the rela with <member type="way" role="outer"/>
     res = DataFrame()
     adminname = findall("tag[@k='name']", rela)[1]["v"]
+    a = 1
     for member in findall("member[@type='way' and @role='outer']", rela)
         wayid = parse(Int, member["ref"])
         nodes = ways_refs[wayid]
-        append!(res,DataFrame(adminname=adminname, wayid=wayid, nodes=nodes, x=getX.(getindex.(Ref(idtoENU),nodes)), y=getY.(getindex.(Ref(idtoENU),nodes) )))
+        x_vals = getX.(getindex.(Ref(idtoENU),nodes))
+        y_vals = getY.(getindex.(Ref(idtoENU),nodes))
+        if a > 1
+            first_point = (x_vals[1], y_vals[1])
+            last_point = (x_vals[end],y_vals[end])
+            last_added_point = (res.x[end],res.y[end])
+            rev = argmin(
+                [abs(last_point[1]-last_added_point[1])+
+                abs(last_point[2]-last_added_point[2]),
+                abs(first_point[1]-last_added_point[1])+
+                abs(first_point[2]-last_added_point[2])])
+            if rev == 1
+                x_vals = reverse(x_vals)
+                y_vals = reverse(y_vals)
+            end
+        end
+        a+=1
+        append!(res,DataFrame(adminname=adminname, wayid=wayid, nodes=nodes, 
+                x=x_vals,y=y_vals))
     end
     res
 end
