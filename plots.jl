@@ -14,7 +14,7 @@ function plot_heatmap(city_points, attr_points,boundaries,
     north = [i.north for i in city_points]
     east = [i.east for i in city_points]
     figure = Plots.scatter(east,north,zcolor = attr_points,legend=false,
-                    colorbar=true, aspect_ratio=:equal, color = :oslo,
+                    colorbar=true, aspect_ratio=:equal,
                     markerstrokealpha=0,markershape=:rect,
                     markersize = 2,
                     title = string("city: ", city,

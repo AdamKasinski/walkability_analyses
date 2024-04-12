@@ -75,6 +75,39 @@ function generate_points_in_sector(distance::Float64,num_of_points::Int,
 end
 
 
+function check_point(point, city_boundaries, tree)
+
+    pt = Luxor.Point(point.east, point.north)
+
+    if check_if_inside(city_boundaries,pt) && check_if_in_wilderness(tree,point)
+        return point
+    end
+    return ENU(Inf16,Inf16,Inf16)
+end
+
+function generate_rectangles(centre, boundaries_east, boundaries_north, rectangle_bounds,distance, tree)
+
+    min = ENU(LLA(rectangle_bounds["minlat"],rectangle_bounds["minlon"],0),centre)
+    max = ENU(LLA(rectangle_bounds["maxlat"],rectangle_bounds["maxlon"],0),centre)
+    city_boundaries = Luxor.Point.(boundaries_east,boundaries_north)
+    x_distance = max.east - min.east
+    y_distance = max.north - min.north
+    
+    num_of_x = ceil(Int,x_distance/distance)
+    num_of_y = ceil(Int,y_distance/distance)
+
+    x_cords = range(min.east, stop=max.east, length=num_of_x)
+    y_cords = range(min.north, stop=max.north, length=num_of_y)
+    city_cords = Matrix{Union{ENU,Nothing}}(nothing,num_of_x,num_of_y)
+
+    for (x_ind, x) in enumerate(x_cords)
+        for (y_ind, y) in enumerate(y_cords)
+            point = ENU(x,y,0.0)
+            city_cords[x_ind,y_ind] = check_point(point,city_boundaries, tree)
+        end
+    end
+    return city_cords
+end
 """
 The function generates a point at a distance n from the center
 
@@ -88,9 +121,7 @@ function find_point_at_distance(radius::Float64, radian::Float64,city_boundaries
                                                                             tree)
     point = ENU(radius*cos(radian),radius*sin(radian),0)
     pt = Luxor.Point(point.east, point.north)
-    if pt == Point(13365.097862825516, -6809.857496093205)
-        a = 2
-    end
+
     if check_if_inside(city_boundaries,pt) && check_if_in_wilderness(tree,point)
         return point
     end
@@ -191,7 +222,8 @@ generates 100 sectors evenly spaced apart.
 
 function calculate_attractiveness_for_city_points(city_name::String, admin_level::String, 
                                                 search_area::Int,num_of_points::Int,
-                                                attr::Symbol,wilderness_distance,
+                                                attr::Symbol,wilderness_distance,shape,
+                                                dist,
                                                 num_of_sectors=0, distance=0.0)
     
     download_city_with_bounds(city_name,admin_level)
@@ -209,25 +241,24 @@ function calculate_attractiveness_for_city_points(city_name::String, admin_level
     city_boundaries = extract_points_ENU(boundaries_file,city_centre)
     admin_city_centre = get_city_centre(boundaries_file)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
-
+    rectangle_boundaries = get_city_bounds(city_name,admin_level)
     city_tree = generate_index(wilderness_distance, city_map.nodes)
-    if num_of_sectors == 0
+    if shape == "circle"
+        if num_of_sectors == 0
+            city_points = generate_sectors(city_centre,num_of_points,city_boundaries.x,
+                                city_boundaries.y,rectangle_boundaries,city_tree)
 
-        rectangle_boundaries = get_city_bounds(city_name,admin_level)
-        city_points = generate_sectors(city_centre,num_of_points,city_boundaries.x,
-                            city_boundaries.y,rectangle_boundaries,city_tree)
+        else
 
-    else
+            city_points = generate_sectors(num_of_sectors,distance,
+                                            num_of_points,city_boundaries.x,
+                                            city_boundaries.y,city_tree)
 
-        city_points = generate_sectors(num_of_sectors,distance,
-                                        num_of_points,city_boundaries.x,
-                                        city_boundaries.y,city_tree)
-
+        end
+    elseif shape == "rectangle"
+        city_points = generate_rectangles(city_centre,city_boundaries.x,city_boundaries.y,
+                                            rectangle_boundaries,dist,city_tree)
     end
-
-#    num_of_sectors::Int,distance::Float64,num_of_points::Int,
-#    city_boundaries_lat::Vector{Float64},city_boundaries_lon::Vector{Float64},tree
-
 
     return city_points,
             to_zero.(
