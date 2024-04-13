@@ -7,7 +7,7 @@ using DataFrames
 
 
 function plot_heatmap(city_points, attr_points,boundaries,
-                        attribute, city, points_in_sector,
+                        attribute, city,
                         search_area,
                         wilderness_distance)
     
@@ -19,7 +19,6 @@ function plot_heatmap(city_points, attr_points,boundaries,
                     markersize = 2,
                     title = string("city: ", city,
                     " attribute: ", attribute,"\n",
-                    " points_in_sector: ", points_in_sector,"\n",
                     " search area: ", search_area,"\n",
                     " wilderness_distance: ", wilderness_distance,"\n"),
                     titlefontsize=10,
