@@ -131,10 +131,12 @@ Creates a Points of Interest (POI) file based on an OSM file.
 - 'scrape_config': The configuration file specifying how to extract POIs.
 - 'save_as'::String: The name of the CSV file where the POI table will be saved.
 """
-function get_POI(file::String,scrape_config = nothing, save_as::String = "")
+function get_POI(file::String,scrape_config = nothing, save_as::String = "") 
     if endswith(file,"osm")
         if isnothing(scrape_config)
             scrape_config = OSMToolset.ScrapePOIConfig()
+        else
+            scrape_config = OSMToolset.ScrapePOIConfig(scrape_config)
         end
         fl = OSMToolset.find_poi(file;scrape_config)
         save_asm(fl,save_as)

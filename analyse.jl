@@ -94,14 +94,15 @@ generates 100 sectors evenly spaced apart.
 function calculate_attractiveness_for_city_points(city_name::String, 
                         admin_level::String, search_area::Int,attr::Symbol,
                         wilderness_distance,shape;calculate_percent=false,
-                        distance=0.0,num_of_points=0.0,num_of_sectors=0.0)
+                        distance=0.0,num_of_points=0.0,num_of_sectors=0.0,
+                        scrape_config = nothing)
     
     download_city_with_bounds(city_name,admin_level)
 
     if isfile("$city_name.csv")
-        df_city = get_POI("$city_name.csv")
+        df_city = get_POI("$city_name.csv",scrape_config)
     else
-        df_city = get_POI("$city_name.osm",nothing,"$city_name.csv")
+        df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv")
     end
 
     download_boundaries_file(city_name,admin_level)
