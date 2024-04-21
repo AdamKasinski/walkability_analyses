@@ -1,5 +1,4 @@
 using Luxor
-using PythonCall
 using Colors
 using OpenStreetMapXPlot
 using Plots

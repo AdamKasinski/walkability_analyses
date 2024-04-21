@@ -59,16 +59,21 @@ if generate_sectors function used, there is no need to use the function - attrac
 each point is already generated
 """
 function calculate_attractiveness_of_points(points_matrix,attractivenessSpatIndex,
-                                            attribute::Symbol,centre::LLA)
+                                            attribute::Symbol,centre::LLA;
+                                            calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                                            distance::Function=OpenStreetMapX.distance)
 
     dim1, dim2 = size(points_matrix)
     attr_matrix = zeros(Float64,dim1,dim2)
+    #attr = getfield(attribute)
     for i in 1:dim1
         for j in 1:dim2
             if points_matrix[i,j] != ENU(Inf16,Inf16,Inf16)
                 pt = LLA(points_matrix[i,j],centre)
                 attr_matrix[i,j] = getfield(OSMToolset.attractiveness(
-                    attractivenessSpatIndex,pt),attribute)
+                    attractivenessSpatIndex,pt,
+                    calculate_attractiveness=calculate_attractiveness, 
+                    distance=distance),attribute)
             end
         end
     end
@@ -91,11 +96,23 @@ generates 100 sectors evenly spaced apart.
 - 'distance' - distance between sectors
 """
 
+function actual_route_distance(m::MapData, routing::Symbol,center, enu1::ENU, enu2::ENU)
+    point1 = LLA(enu1,center)#(enu1.east,enu1.north)
+    point2 = LLA(enu2,center)#(enu2.east,enu2.north)
+    node1 = point_to_nodes(point1,m)
+    node2 = point_to_nodes(point2,m)
+    # Call the shortest_route function with the appropriate MapData and nodes
+    route_nodes, distance, route_time = OpenStreetMapX.shortest_route(m, node1, node2, routing=routing)
+    return distance  # Return only the distance value
+end
+
 function calculate_attractiveness_for_city_points(city_name::String, 
                         admin_level::String, search_area::Int,attr::Symbol,
                         wilderness_distance,shape;calculate_percent=false,
-                        distance=0.0,num_of_points=0.0,num_of_sectors=0.0,
-                        scrape_config = nothing)
+                        distance_sectors=0.0,num_of_points=0.0,num_of_sectors=0.0,
+                        scrape_config = nothing,
+                        calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                        distance::Function=OpenStreetMapX.distance)
     
     download_city_with_bounds(city_name,admin_level)
 
@@ -122,12 +139,12 @@ function calculate_attractiveness_for_city_points(city_name::String,
     if calculate_percent
         dist_min = OpenStreetMapX.distance(min_point,ENU(0,0,0))
         dist_max = OpenStreetMapX.distance(max_point,ENU(0,0,0))
-        distance = maximum([dist_min,dist_max])/100
+        distance_sectors = maximum([dist_min,dist_max])/100
         num_of_sectors = 100
     end
 
     shape_arguments = get_shape_args(shape, city_boundaries, 
-                                    city_tree,distance, num_of_points, 
+                                    city_tree,distance_sectors, num_of_points, 
                                     num_of_sectors,rectangle_boundaries,
                                     min_point, max_point)
 
@@ -137,9 +154,13 @@ function calculate_attractiveness_for_city_points(city_name::String,
         points = generate_rectangles(shape_arguments...)
     end
 
+    actual_route_distance_arg = (enu1, enu2) -> actual_route_distance(city_map,
+                            :astar,city_centre, enu1, enu2)
     return points,
             calculate_attractiveness_of_points(points,
-                                ix_city,attr,city_centre),
+                                ix_city,attr,city_centre,
+                    calculate_attractiveness = calculate_attractiveness, 
+                    distance= distance),
             city_boundaries
 end
 
