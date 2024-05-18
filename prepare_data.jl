@@ -2,7 +2,7 @@ using Downloads
 using OSMToolset
 using OpenStreetMapX
 using Downloads
-using GZip
+#using GZip
 using DataFrames
 using CSV
 using HTTP
@@ -10,7 +10,6 @@ using JSON
 using EzXML
 using DataFrames
 using Statistics
-# TODO jest balagan z bibliotekami, tu jest uzywane readxml a nie jest importowane (dodalem import)
 
 """ 
 Retrieves the area defined by the outermost vertices of the specified city.
@@ -109,7 +108,8 @@ Creates a map from an OSM file.
 - 'file'::String: The name of the file used to create the map.
 """
 function create_map(file::String)
-    return get_map_data(file,use_cache = true)
+    return get_map_data(file,use_cache = true,only_intersections=false,
+                        trim_to_connected_graph=true)
 end
 
 """

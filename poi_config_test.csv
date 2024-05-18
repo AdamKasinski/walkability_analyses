@@ -1,6 +1,6 @@
 key values group influence range
 amenity kindergarten education 3 2000
-amenity school,music_school,language_school education 5 3000
+amenity school,music_school,language_school education 5 5000
 amenity university,college higher_education 20 2000
 amenity library education 5 1000
 amenity restaurant restaurants 5 1000
@@ -31,3 +31,4 @@ leisure sports_centre,sports_hall,stadium,track,pitch,horse_riding,swimming_pool
 sport fitness leisure 5 800
 landuse recreation_ground,winter_sports leisure 5 1500
 tourism * leisure 5 1500
+amenity police police 10 1500

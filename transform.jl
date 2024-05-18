@@ -4,7 +4,7 @@ using Statistics
 
 
 function to_zero(elem)
-    if elem == Inf || elem < 0 
+    if elem == Inf || elem < 0 #nan != nan16 => .isnan()
         return 0
     end
     return elem

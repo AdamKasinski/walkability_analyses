@@ -4,17 +4,12 @@ using Statistics
 using Luxor
 using SpatialIndexing
 using Match
+using LightOSM
 include("prepare_data.jl")
 include("sectors.jl")
 include("transform.jl")
 include("point_search.jl")
 
-# TODO
-# 1) get the generate sectors function right - rectangle, circle - add more function 
-# 2) check type of points - it is better to keep one type for check_if_inside
-# 3) create function which prepare all necessary data - boundaries, poi etc.
-# 4) change the POI file - e.g. university
-# 5) try to add KNN method instead average calculation 
 
 """
 - 'points'::Array{LLA,2} - matrix with LLA points
@@ -26,7 +21,9 @@ if generate_sectors function used, there is no need to use the function - attrac
 each point is already generated
 """
 function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatIndex,
-                                                                attribute::Symbol,centre::LLA)
+                                                        attribute::Symbol,centre::LLA,
+                    calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                    distance::Function=OpenStreetMapX.distance)
 
     dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
@@ -38,7 +35,11 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
             if points_matrix[i,j] != ENU(Inf16,Inf16,Inf16)
                 pt = LLA(points_matrix[i,j],centre)
                 push!(attr,getfield(OSMToolset.attractiveness(
-                    attractivenessSpatIndex,pt),attribute))
+                    attractivenessSpatIndex,pt,
+                    calculate_attractiveness=calculate_attractiveness, 
+                    distance=distance),attribute))
+            else
+                push!(attr,0)
             end
         end
         attract[i] = mean(attr)
@@ -96,14 +97,25 @@ generates 100 sectors evenly spaced apart.
 - 'distance' - distance between sectors
 """
 
-function actual_route_distance(m::MapData, routing::Symbol,center, enu1::ENU, enu2::ENU)
+function actual_route_distance(g, m ,center, enu1::ENU, enu2::ENU)
     point1 = LLA(enu1,center)#(enu1.east,enu1.north)
     point2 = LLA(enu2,center)#(enu2.east,enu2.north)
-    node1 = point_to_nodes(point1,m)
-    node2 = point_to_nodes(point2,m)
-    # Call the shortest_route function with the appropriate MapData and nodes
-    route_nodes, distance, route_time = OpenStreetMapX.shortest_route(m, node1, node2, routing=routing)
-    return distance  # Return only the distance value
+    nd1 = LightOSM.nearest_node(g,[point1.lat,point1.lon])[1]
+    nd2 = LightOSM.nearest_node(g,[point2.lat,point2.lon])[1]
+    pth = LightOSM.shortest_path(g, nd1, nd2)
+    if isnothing(pth)
+        return 10000.0
+    end
+    distance = cumsum(LightOSM.weights_from_path(g, pth))[end]*1000
+    return distance
+end
+
+function change_ENU_center(map_nodes, current_center, final_center)
+    node_keys = collect(keys(map_nodes))
+    nodes = collect(values(map_nodes))
+    LLAs = [LLA(node,current_center) for node in nodes]
+    ENUs = [ENU(LLA_point,final_center) for LLA_point in LLAs]
+    return Dict(zip(node_keys, ENUs))
 end
 
 function calculate_attractiveness_for_city_points(city_name::String, 
@@ -112,7 +124,8 @@ function calculate_attractiveness_for_city_points(city_name::String,
                         distance_sectors=0.0,num_of_points=0.0,num_of_sectors=0.0,
                         scrape_config = nothing,
                         calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
-                        distance::Function=OpenStreetMapX.distance)
+                        distance=OpenStreetMapX.distance,
+                        rectangle_boundaries = [])
     
     download_city_with_bounds(city_name,admin_level)
 
@@ -126,15 +139,18 @@ function calculate_attractiveness_for_city_points(city_name::String,
     boundaries_file = string(city_name,"_boundaries.osm")
     city_map = create_map("$city_name.osm")
     city_centre = OpenStreetMapX.center(city_map.bounds)
-    city_boundaries = extract_points_ENU(boundaries_file,city_centre)
     admin_city_centre = get_city_centre(boundaries_file)
+    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
-    rectangle_boundaries = get_city_bounds(city_name,admin_level)
-    city_tree = generate_index(wilderness_distance, city_map.nodes)
+    if rectangle_boundaries == []
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+    end
+    nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
+    city_tree = generate_index(wilderness_distance, nodes_for_tree)
     min_point = ENU(LLA(rectangle_boundaries["minlat"],
-                        rectangle_boundaries["minlon"],0),city_centre)
+                        rectangle_boundaries["minlon"],0),admin_city_centre)
     max_point = ENU(LLA(rectangle_boundaries["maxlat"],
-                        rectangle_boundaries["maxlon"],0),city_centre)
+                        rectangle_boundaries["maxlon"],0),admin_city_centre)
 
     if calculate_percent
         dist_min = OpenStreetMapX.distance(min_point,ENU(0,0,0))
@@ -154,13 +170,21 @@ function calculate_attractiveness_for_city_points(city_name::String,
         points = generate_rectangles(shape_arguments...)
     end
 
-    actual_route_distance_arg = (enu1, enu2) -> actual_route_distance(city_map,
-                            :astar,city_centre, enu1, enu2)
+#    g = graph_from_file("$city_name.osm", weight_type = :distance,network_type=:walk)#,
+#                    network_type=:walk,precompute_dijkstra_states=true)
+
+    
+    if distance == :actual_route_distance_arg
+        distance = (enu1, enu2) -> actual_route_distance(g,
+                                            city_map,admin_city_centre, 
+                                            enu1, enu2)
+    end
+
     return points,
             calculate_attractiveness_of_points(points,
-                                ix_city,attr,city_centre,
+                                ix_city,attr,admin_city_centre,
                     calculate_attractiveness = calculate_attractiveness, 
-                    distance= distance),
+                    distance = distance),
             city_boundaries
 end
 
@@ -184,52 +208,63 @@ generates 100 sectors evenly spaced apart
 """
 
 function calculate_attractiveness_for_city_sectors(city_name::String, admin_level::String, 
-                                                search_area::Int,attr::Symbol,
-                                                wilderness_distance,num_of_points;
-                                                calculate_percent=false, distance=0.0,num_of_sectors=0.0)
+                        search_area::Int,attr::Symbol,
+                        wilderness_distance,num_of_points;
+                        calculate_percent=true, distance_sectors=0.0,num_of_sectors=0,
+                        scrape_config = nothing,
+                        calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                        distance=OpenStreetMapX.distance,
+                        rectangle_boundaries = [])
 
     download_city_with_bounds(city_name,admin_level)
 
     if isfile("$city_name.csv")
-        df_city = get_POI("$city_name.csv")
+        df_city = get_POI("$city_name.csv",scrape_config)
     else
-        df_city = get_POI("$city_name.osm",nothing,"$city_name.csv")
+        df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv")
     end
 
     download_boundaries_file(city_name,admin_level)
     boundaries_file = string(city_name,"_boundaries.osm")
     city_map = create_map("$city_name.osm")
     city_centre = OpenStreetMapX.center(city_map.bounds)
-    city_boundaries = extract_points_ENU(boundaries_file,city_centre)
-
-    #admin_city_centre = get_city_centre(boundaries_file)
+    admin_city_centre = get_city_centre(boundaries_file)
+    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
-    rectangle_boundaries = get_city_bounds(city_name,admin_level)
-    city_tree = generate_index(wilderness_distance, city_map.nodes)
+    if rectangle_boundaries == []
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+    end
+    nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
+    city_tree = generate_index(wilderness_distance, nodes_for_tree)
+    min_point = ENU(LLA(rectangle_boundaries["minlat"],
+                        rectangle_boundaries["minlon"],0),admin_city_centre)
+    max_point = ENU(LLA(rectangle_boundaries["maxlat"],
+                        rectangle_boundaries["maxlon"],0),admin_city_centre)
 
     if calculate_percent
-        min_point = ENU(LLA(rectangle_boundaries["minlat"],
-                        rectangle_boundaries["minlon"],0),city_centre)
-        max_point = ENU(LLA(rectangle_boundaries["maxlat"],
-                        rectangle_boundaries["maxlon"],0),city_centre)
         dist_min = OpenStreetMapX.distance(min_point,ENU(0,0,0))
         dist_max = OpenStreetMapX.distance(max_point,ENU(0,0,0))
-        distance = maximum([dist_min,dist_max])/100
+        distance_sectors = maximum([dist_min,dist_max])/100
         num_of_sectors = 100
     end
 
     shape_arguments = get_shape_args("circle", city_boundaries, 
-                                    city_tree,distance, num_of_points, 
+                                    city_tree,distance_sectors, num_of_points, 
                                     num_of_sectors,rectangle_boundaries,
                                     min_point, max_point)
 
-
     points = generate_sectors(shape_arguments...)
 
-    return points, 
-        calculate_attractiveness_of_sector(
-            points,ix_city,attr,city_centre),
-        city_boundaries
+    if distance == :actual_route_distance_arg
+        distance = (enu1, enu2) -> actual_route_distance(g,
+                                            city_map,admin_city_centre, 
+                                            enu1, enu2)
+    end
+
+    return points,
+            calculate_attractiveness_of_sector(points,
+                                ix_city,attr,admin_city_centre),
+            city_boundaries
 end
 
 

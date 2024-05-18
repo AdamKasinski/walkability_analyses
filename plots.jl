@@ -36,12 +36,12 @@ function plot_heatmap(city_points, attr_points,boundaries,
 end
 
 function plot_attractiveness_of_sectors_abs(num_of_sectors,distance_between_sectors,
-                                                cities_attr,labels,plotconfig)
-    x_axis = [i*distance*distance_between_sectors for i in 1:num_of_sectors]./1000
-    Plots.plot(x_axis,cities_attr, labels = labels; plotconfig...)
+                                                cities_attr,labels)
+    x_axis = [i*distance_between_sectors for i in 1:num_of_sectors]./1000
+    Plots.plot(x_axis,cities_attr, labels = labels, marker=(:circle,2))
 end
 
-function plot_attractiveness_of_sectors_prcnt(cities_attr,labels,plotconfig)
+function plot_attractiveness_of_sectors_prcnt(cities_attr,labels,title)
     x_axis = [i for i in 1:100]
-    Plots.plot(x_axis,cities_attr, labels = labels; plotconfig...)
+    Plots.plot(x_axis,cities_attr, labels = labels,marker=(:circle,2), title=title)
 end
