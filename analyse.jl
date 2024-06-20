@@ -27,9 +27,11 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 
     dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
-    attrs = [Float64[] for _ in 1:Threads.nthreads()]
-    Threads.@threads for i in 1:dim1
-        attr = attrs[Threads.threadid()]
+    #attrs = [Float64[] for _ in 1:Threads.nthreads()]
+    #Threads.@threads for i in 1:dim1
+    for i in 1:dim1
+        #attr = attrs[Threads.threadid()]
+        attr = []
         fill!(attr, 0.0)
         for j in 1:dim2
             if points_matrix[i,j] != ENU(Inf16,Inf16,Inf16)
