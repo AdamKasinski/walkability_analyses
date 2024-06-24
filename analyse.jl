@@ -27,25 +27,25 @@ function calculate_attractiveness_of_sector(points_matrix,attractivenessSpatInde
 
     dim1, dim2 = size(points_matrix)
     attract = Array{Float64}(undef, dim1)
-    #attrs = [Float64[] for _ in 1:Threads.nthreads()]
-    #Threads.@threads for i in 1:dim1
-    for i in 1:dim1
-        #attr = attrs[Threads.threadid()]
-        attr = []
-        fill!(attr, 0.0)
+
+    attrs = [zeros(Float64, dim2) for _ in 1:Threads.nthreads()]
+
+    Threads.@threads for i in 1:dim1
+        attr = attrs[Threads.threadid()]
         for j in 1:dim2
-            if points_matrix[i,j] != ENU(Inf16,Inf16,Inf16)
-                pt = LLA(points_matrix[i,j],centre)
-                push!(attr,getfield(OSMToolset.attractiveness(
-                    attractivenessSpatIndex,pt,
+            if points_matrix[i,j] != ENU(Inf16, Inf16, Inf16)
+                pt = LLA(points_matrix[i,j], centre)
+                attr[j] = getfield(OSMToolset.attractiveness(
+                    attractivenessSpatIndex, pt,
                     calculate_attractiveness=calculate_attractiveness, 
-                    distance=distance),attribute))
+                    distance=distance), attribute)
             else
-                push!(attr,0)
+                attr[j] = 0.0
             end
         end
         attract[i] = mean(attr)
     end
+
     return attract
 end
 
