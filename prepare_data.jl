@@ -10,6 +10,8 @@ using JSON
 using EzXML
 using DataFrames
 using Statistics
+include("sectors.jl")
+
 
 """ 
 Retrieves the area defined by the outermost vertices of the specified city.
@@ -278,3 +280,108 @@ function get_city_centre(boundaries_file::String)
     return LLA(lat,lon,0)
 end
 
+function prepare_city_map(city_name::String, 
+                admin_level::String, search_area::Int,attr::Symbol,
+                wilderness_distance,shape;calculate_percent=false,
+                distance_sectors=0.0,num_of_points=0,num_of_sectors=0,
+                scrape_config = nothing,
+                calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                distance=OpenStreetMapX.distance,
+                rectangle_boundaries = [])
+    
+    download_city_with_bounds(city_name,admin_level)
+
+    if isfile("$city_name.csv")
+        df_city = get_POI("$city_name.csv",scrape_config)
+    else
+        df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv")
+    end
+
+    download_boundaries_file(city_name,admin_level)
+    boundaries_file = string(city_name,"_boundaries.osm")
+    city_map = create_map("$city_name.osm")
+    city_centre = OpenStreetMapX.center(city_map.bounds)
+    admin_city_centre = get_city_centre(boundaries_file)
+    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre)
+    ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
+    if rectangle_boundaries == []
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+    end
+    nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
+    city_tree = generate_index(wilderness_distance, nodes_for_tree)
+    min_point = ENU(LLA(rectangle_boundaries["minlat"],
+                        rectangle_boundaries["minlon"],0),admin_city_centre)
+    max_point = ENU(LLA(rectangle_boundaries["maxlat"],
+                        rectangle_boundaries["maxlon"],0),admin_city_centre)
+
+    if calculate_percent
+        dist_min = OpenStreetMapX.distance(min_point,ENU(0,0,0))
+        dist_max = OpenStreetMapX.distance(max_point,ENU(0,0,0))
+        distance_sectors = maximum([dist_min,dist_max])/100
+        num_of_sectors = 100
+    end
+
+    shape_arguments = get_shape_args(shape, city_boundaries, 
+                                    city_tree,distance_sectors, num_of_points, 
+                                    num_of_sectors,rectangle_boundaries,
+                                    min_point, max_point)
+
+    if shape == "circle"
+        points = generate_sectors(shape_arguments...)
+    elseif shape == "rectangle"
+        points = generate_rectangles(shape_arguments...)
+    end
+
+    return points, admin_city_centre, ix_city, df_city, city_boundaries, city_map
+end
+
+
+function prepare_city_sectors(city_name::String, admin_level::String, 
+                            search_area::Int,attr::Symbol,
+                            wilderness_distance,num_of_points;
+                            calculate_percent=true, distance_sectors=0.0,
+                            num_of_sectors=0, scrape_config = nothing,
+                calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+                            distance=OpenStreetMapX.distance,
+                            rectangle_boundaries = [])
+    
+    download_city_with_bounds(city_name,admin_level)
+
+    if isfile("$city_name.csv")
+        df_city = get_POI("$city_name.csv",scrape_config)
+    else
+        df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv")
+    end
+
+    download_boundaries_file(city_name,admin_level)
+    boundaries_file = string(city_name,"_boundaries.osm")
+    city_map = create_map("$city_name.osm")
+    city_centre = OpenStreetMapX.center(city_map.bounds)
+    admin_city_centre = get_city_centre(boundaries_file)
+    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre)
+    ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
+    if rectangle_boundaries == []
+        rectangle_boundaries = get_city_bounds(city_name,admin_level)
+    end
+    nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
+    city_tree = generate_index(wilderness_distance, nodes_for_tree)
+    min_point = ENU(LLA(rectangle_boundaries["minlat"],
+                        rectangle_boundaries["minlon"],0),admin_city_centre)
+    max_point = ENU(LLA(rectangle_boundaries["maxlat"],
+                        rectangle_boundaries["maxlon"],0),admin_city_centre)
+
+    if calculate_percent
+        dist_min = OpenStreetMapX.distance(min_point,ENU(0,0,0))
+        dist_max = OpenStreetMapX.distance(max_point,ENU(0,0,0))
+        distance_sectors = maximum([dist_min,dist_max])/100
+        num_of_sectors = 100
+    end
+
+    shape_arguments = get_shape_args("circle", city_boundaries, 
+                                    city_tree,distance_sectors, num_of_points, 
+                                    num_of_sectors,rectangle_boundaries,
+                                    min_point, max_point)
+
+    return generate_sectors(shape_arguments...), admin_city_centre, ix_city, df_city, city_boundaries, city_map
+
+end
