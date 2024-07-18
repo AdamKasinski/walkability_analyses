@@ -331,7 +331,12 @@ function prepare_city_map(city_name::String,
         points = generate_rectangles(shape_arguments...)
     end
 
-    return points, admin_city_centre, ix_city, df_city, city_boundaries, city_map
+    return City_points(points, 
+                        admin_city_centre, 
+                        ix_city, 
+                        df_city, 
+                        city_boundaries, 
+                        city_map)
 end
 
 
@@ -381,6 +386,30 @@ function prepare_city_sectors(city_name::String, admin_level::String,
                                     num_of_sectors,rectangle_boundaries,
                                     min_point, max_point)
 
-    return generate_sectors(shape_arguments...), admin_city_centre, ix_city, df_city, city_boundaries, city_map
+    return City_sectors(generate_sectors(shape_arguments...),
+                                        admin_city_centre, 
+                                        ix_city, 
+                                        df_city, 
+                                        city_boundaries, 
+                                        city_map)
 
+end
+
+
+struct City_sectors
+    sectors
+    admin_city_centre 
+    ix_city
+    df_city
+    city_boundaries
+    city_map
+end
+
+struct City_points
+    points
+    admin_city_centre
+    ix_city
+    df_city
+    city_boundaries
+    city_map
 end
