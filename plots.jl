@@ -4,7 +4,6 @@ using OpenStreetMapXPlot
 using Plots
 using DataFrames
 
-
 function plot_heatmap(city_points, attr_points,boundaries,
                         attribute, city,
                         search_area,

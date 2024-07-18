@@ -7,7 +7,13 @@
 
 using DataFrames
 using OpenStreetMapX
+using KernelDensity
 
-function get_amenity_point(city_poi::DataFrame,amenity::String)
+
+function get_amenity_values(city_poi::DataFrame,amenity::String)
     return city_poi[city_poi.value .== amenity, [:lat,:lon]]
+end
+
+function get_amenity_group(city_poi::DataFrame,amenity::String)
+    return city_poi[city_poi.group .== amenity, [:lat,:lon]]
 end

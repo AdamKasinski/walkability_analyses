@@ -325,7 +325,6 @@ function prepare_city_map(city_name::String,
                                     city_tree,distance_sectors, num_of_points, 
                                     num_of_sectors,rectangle_boundaries,
                                     min_point, max_point)
-
     if shape == "circle"
         points = generate_sectors(shape_arguments...)
     elseif shape == "rectangle"
