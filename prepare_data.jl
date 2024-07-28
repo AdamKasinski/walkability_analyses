@@ -12,7 +12,6 @@ using DataFrames
 using Statistics
 include("sectors.jl")
 
-
 """ 
 Retrieves the area defined by the outermost vertices of the specified city.
 
@@ -109,9 +108,9 @@ Creates a map from an OSM file.
 
 - 'file'::String: The name of the file used to create the map.
 """
-function create_map(file::String)
-    return get_map_data(file,use_cache = true,only_intersections=false,
-                        trim_to_connected_graph=true)
+function create_map(file::String;use_cache = true,trim_to_connected_graph=true)
+    return get_map_data(file,use_cache = use_cache,only_intersections=false,
+                        trim_to_connected_graph=trim_to_connected_graph)
 end
 
 """

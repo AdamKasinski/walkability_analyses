@@ -99,8 +99,8 @@ generates 100 sectors evenly spaced apart.
 """
 
 function actual_route_distance(g, m ,center, enu1::ENU, enu2::ENU)
-    point1 = LLA(enu1,center)#(enu1.east,enu1.north)
-    point2 = LLA(enu2,center)#(enu2.east,enu2.north)
+    point1 = LLA(enu1,center)
+    point2 = LLA(enu2,center)
     nd1 = LightOSM.nearest_node(g,[point1.lat,point1.lon])[1]
     nd2 = LightOSM.nearest_node(g,[point2.lat,point2.lon])[1]
     pth = LightOSM.shortest_path(g, nd1, nd2)
