@@ -44,3 +44,19 @@ function plot_attractiveness_of_sectors_prcnt(cities_attr,labels,title)
     x_axis = [i for i in 1:100]
     Plots.plot(x_axis,cities_attr, labels = labels,marker=(:circle,2), title=title)
 end
+
+function tile_plot(boundaries, density, xs, ys)
+    
+    figure = Plots.plot()
+    grouped_ways = DataFrames.groupby(boundaries, :wayid)
+    for (y,x,d) in zip(eachrow(xs),eachrow(ys),density)
+        Plots.plot!(figure, x, y, seriestype = :shape, lw = 0, fillalpha=1,
+                    aspect_ratio=:equal, legend = false, fill_z=d)
+    end
+    for (key, way) in pairs(grouped_ways)
+        Plots.plot!(figure, way.x, way.y, label="wayid $(key)", 
+                    line=:path,legend=false,linecolor=:red,
+                                        linewidth=2)
+    end
+    return figure
+end

@@ -61,3 +61,42 @@ function get_city_bounds(city_name)
     return city_boundaries, admin_city_centre
 end
 
+function get_tile_values(city::String, nrows, ncols, out_dir;
+                                            new_tile_files=false)
+    if new_tile_files
+        if isdir(out_dir)
+            rm(out_dir,recursive=true)
+            mkdir(out_dir)
+        else
+            mkdir(out_dir)
+        end
+        
+        tile_osm_file(string(city,".osm"), nrow=nrows,ncol=ncols,
+                                                    out_dir=out_dir)
+    
+    end
+    num_of_tiles::Int = nrows*ncols
+    files = readdir(out_dir)
+    bounds = Vector{Union{OpenStreetMapX.Bounds{LLA}, Nothing}}(undef, 
+                                                            num_of_tiles)
+    lengths::Array{Float64} = zeros(Float64,num_of_tiles)
+    areas::Array{Float64} = zeros(Float64,num_of_tiles)
+    xs::Matrix{Float64} = zeros(Float64,num_of_tiles,4)
+    ys::Matrix{Float64} = zeros(Float64,num_of_tiles,4)
+
+    boundaries, admin_city_centre = get_city_bounds(city)
+    for (i, elem) in enumerate(files)
+        file = joinpath(out_dir,elem)
+        city_parse = OpenStreetMapX.parseOSM(file)
+        city_map = create_map(file; use_cache = false, trim_to_connected_graph=false)
+        city_centre = OpenStreetMapX.center(city_map.bounds)
+        bounds[i] = city_map.bounds
+        lengths[i] = calc_tile_road_length(city_parse,city_centre)
+        areas[i] = calc_tile_area(city_map.bounds,city_centre)
+        x,y = rectangle(city_map.bounds,admin_city_centre)
+        xs[i,:] = x
+        ys[i,:] = y    
+    end
+    density::Array{Float64} = min_max_scaling(lengths./areas)
+    return boundaries, density, xs, ys
+end
