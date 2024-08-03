@@ -127,16 +127,16 @@ function calculate_attractiveness_for_city_points(city_name::String,
                         scrape_config = nothing,
                         calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                         distance=OpenStreetMapX.distance,
-                        rectangle_boundaries = [])
+                        rectangle_boundaries = [],in_admin_bounds=true)
     
     points, admin_city_centre, ix_city, df_city, city_boundaries, city_map = prepare_city_map(city_name, 
                         admin_level, search_area, attr,
-                        wilderness_distance,shape;calculate_percent,
+                        wilderness_distance,shape; calculate_percent,
                         distance_sectors,num_of_points,num_of_sectors,
                         scrape_config,
                         calculate_attractiveness=OSMToolset.calculate_attractiveness, 
                         distance=OpenStreetMapX.distance,
-                        rectangle_boundaries)
+                        rectangle_boundaries,in_admin_bounds=in_admin_bounds)
     
     if distance == :actual_route_distance_arg
         distance = (enu1, enu2) -> actual_route_distance(g,

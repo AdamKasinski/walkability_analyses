@@ -44,18 +44,24 @@ function generate_points_in_sector(distance::Float64,num_of_points::Int,
 end
 
 
-function check_point(point, city_boundaries, tree)
+function check_point(point, city_boundaries, tree; in_admin_bounds=true)
 
     pt = Luxor.Point(point.east, point.north)
-
-    if check_if_inside(city_boundaries,pt) && check_if_in_wilderness(tree,point)
-        return point
+    if in_admin_bounds
+        if check_if_inside(city_boundaries,pt) && check_if_in_wilderness(tree,point)
+            return point
+        end
+    else
+        if check_if_in_wilderness(tree,point)
+            return point
+        end
     end
     return ENU(Inf16,Inf16,Inf16)
 end
 
 function generate_rectangles(boundaries_east, boundaries_north, 
-                            rectangle_bounds,distance, tree, min_point, max_point)
+                            rectangle_bounds,distance, tree, 
+                            min_point, max_point,in_admin_bounds=true)
 
     city_boundaries = Luxor.Point.(boundaries_east,boundaries_north)
     x_distance = max_point.east - min_point.east
@@ -71,7 +77,7 @@ function generate_rectangles(boundaries_east, boundaries_north,
     for (x_ind, x) in enumerate(x_cords)
         for (y_ind, y) in enumerate(y_cords)
             point = ENU(x,y,0.0)
-            city_cords[x_ind,y_ind] = check_point(point,city_boundaries, tree)
+            city_cords[x_ind,y_ind] = check_point(point,city_boundaries, tree;in_admin_bounds)
         end
     end
     return city_cords
@@ -101,7 +107,7 @@ end
 
 function get_shape_args(shape, city_boundaries, 
                         city_tree,distance, num_of_points, 
-                        num_of_sectors,rectangle_boundaries,min_point, max_point)
+                        num_of_sectors,rectangle_boundaries,min_point, max_point;in_admin_bounds=true)
 
     @match shape begin
         $"circle" => return (
@@ -119,7 +125,8 @@ function get_shape_args(shape, city_boundaries,
                             distance,
                             city_tree,
                             min_point,
-                            max_point
+                            max_point,
+                            in_admin_bounds
                         )
     end
 end

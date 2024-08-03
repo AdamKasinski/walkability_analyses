@@ -286,7 +286,7 @@ function prepare_city_map(city_name::String,
                 scrape_config = nothing,
                 calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                 distance=OpenStreetMapX.distance,
-                rectangle_boundaries = [])
+                rectangle_boundaries = [], in_admin_bounds=true)
     
     download_city_with_bounds(city_name,admin_level)
 
@@ -323,19 +323,27 @@ function prepare_city_map(city_name::String,
     shape_arguments = get_shape_args(shape, city_boundaries, 
                                     city_tree,distance_sectors, num_of_points, 
                                     num_of_sectors,rectangle_boundaries,
-                                    min_point, max_point)
+                                    min_point, max_point,
+                                    in_admin_bounds=in_admin_bounds)
     if shape == "circle"
         points = generate_sectors(shape_arguments...)
     elseif shape == "rectangle"
         points = generate_rectangles(shape_arguments...)
     end
 
-    return City_points(points, 
-                        admin_city_centre, 
-                        ix_city, 
-                        df_city, 
-                        city_boundaries, 
-                        city_map)
+    return points,
+        admin_city_centre,
+        ix_city,
+        df_city,
+        city_boundaries,
+        city_map
+
+    #return City_points(points, 
+    #                    admin_city_centre, 
+    #                    ix_city, 
+    #                    df_city, 
+    #                    city_boundaries, 
+    #                    city_map)
 end
 
 
