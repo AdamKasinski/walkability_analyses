@@ -6,6 +6,21 @@ using SpatialIndexing
 
 
 
+function generate_index_val(nodes, values::Array{Float64}) #TODO: change to matrix
+    
+    data = SpatialElem{Float64, 2, Int64, Float64}[]
+    id = 1
+
+    for (node, value) in zip(nodes, values)
+        rect = SpatialIndexing.Rect((node.east,node.north),
+                                    (node.east,node.north))
+        push!(data,SpatialElem(rect,id,value))
+        id+=1
+    end
+    tree = RTree{Float64,2}(Int, Float64, variant=SpatialIndexing.RTreeStar)
+    SpatialIndexing.load!(tree,data)
+end
+
 function generate_index(node_range, map_nodes)
 
     ET = Pair{Int64, Tuple{Float64, Float64}}
