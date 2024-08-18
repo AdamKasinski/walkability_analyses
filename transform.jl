@@ -5,7 +5,7 @@ using Statistics
 
 function to_zero(elem)
     if elem == Inf || elem < 0
-        return 0
+        return 0.0
     end
     return elem
 end

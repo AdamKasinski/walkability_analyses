@@ -5,21 +5,45 @@ using Luxor
 using SpatialIndexing
 
 
+function generate_index_ways(parsed_map, road_types,city_centre) 
+    ways = parsed_map.ways
+    data = SpatialElem{Float64, 2, Int64, Tuple{Int,Int}}[]
+    id = 1
+    for way in ways
+        if haskey(way.tags, "highway") && (way.tags["highway"] in road_types)
+            for point in 1:(length(way.nodes))
+                node = ENU(parsed_map.nodes[way.nodes[point]],city_centre)
+                rect = SpatialIndexing.Rect((node.east,node.north),
+                                            (node.east,node.north))
+                push!(data,SpatialElem(rect,id,(way.id,point)))
+            end
+            id+=1
+        end
+    end
+    tree = RTree{Float64,2}(Int, Tuple{Int,Int}, variant=SpatialIndexing.RTreeStar)
+    SpatialIndexing.load!(tree,data)
+end
 
-function generate_index_val(nodes, values::Array{Float64}) #TODO: change to matrix
+
+function generate_index_val(nodes, values) 
     
     data = SpatialElem{Float64, 2, Int64, Float64}[]
     id = 1
 
-    for (node, value) in zip(nodes, values)
-        rect = SpatialIndexing.Rect((node.east,node.north),
-                                    (node.east,node.north))
-        push!(data,SpatialElem(rect,id,value))
-        id+=1
+    for i in 1:size(nodes,1)
+        for j in 1:size(nodes,2)
+            node = nodes[i,j]
+            value = values[i,j]
+            rect = SpatialIndexing.Rect((node.east,node.north),
+                                        (node.east,node.north))
+            push!(data,SpatialElem(rect,id,value))
+            id+=1
+        end
     end
     tree = RTree{Float64,2}(Int, Float64, variant=SpatialIndexing.RTreeStar)
     SpatialIndexing.load!(tree,data)
 end
+
 
 function generate_index(node_range, map_nodes)
 

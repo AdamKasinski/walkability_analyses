@@ -49,7 +49,7 @@ function tile_plot(boundaries, density, xs, ys)
     
     figure = Plots.plot()
     grouped_ways = DataFrames.groupby(boundaries, :wayid)
-    for (y,x,d) in zip(eachrow(xs),eachrow(ys),density)
+    for (x,y,d) in zip(eachrow(xs),eachrow(ys),density)
         Plots.plot!(figure, x, y, seriestype = :shape, lw = 0, fillalpha=1,
                     aspect_ratio=:equal, legend = false, fill_z=d)
     end

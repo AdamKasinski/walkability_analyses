@@ -139,7 +139,7 @@ function get_POI(file::String,scrape_config = nothing, save_as::String = "")
         else
             scrape_config = OSMToolset.ScrapePOIConfig(scrape_config)
         end
-        fl = OSMToolset.find_poi(file;scrape_config)
+        fl = OSMToolset.find_poi(file,scrape_config)
         save_asm(fl,save_as)
         return fl
     elseif endswith(file,"csv")
