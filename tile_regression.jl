@@ -154,7 +154,7 @@ function split_map(city, admin_level)
 end
 
 function get_tile_values_from_files(city::String, nrows, ncols, tiles_path,
-                                    road_types)
+                                    road_types;get_density=true)
 
     num_of_tiles::Int = nrows*ncols
     files = readdir(tiles_path)
@@ -173,13 +173,19 @@ function get_tile_values_from_files(city::String, nrows, ncols, tiles_path,
         city_centre = OpenStreetMapX.center(city_map.bounds)
         bounds[i] = city_map.bounds
         lengths[i] = calc_tile_road_length(city_parse,city_centre,road_types)
-        areas[i] = calc_tile_area(city_map.bounds,city_centre)
+        if get_density
+            areas[i] = calc_tile_area(city_map.bounds,city_centre)
+        end
         x,y = rectangle(city_map.bounds,admin_city_centre)
         xs[i,:] = x
         ys[i,:] = y    
     end
-    density::Array{Float64} = min_max_scaling(lengths./areas)
-    return boundaries, density, xs, ys
+    if get_density
+        values_final::Array{Float64} = min_max_scaling(lengths./areas)
+    else
+        values_final = lengths
+    end
+    return boundaries, values_final, xs, ys
 end
 
 
