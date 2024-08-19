@@ -22,11 +22,10 @@ include("transform.jl")
 #                "tertiary_link"]   
 
 
-function calc_all_tiles_length(city_file,admin_level,city_centre,
-                                road_types,ncols,nrows)
+function calc_all_tiles_length(city_file,city_centre,
+                                road_types,tiles,ncols,nrows)
 
         parsed_map = OpenStreetMapX.parseOSM("$city_file.osm")
-        tiles = generate_tiles(city,admin_level,ncols,nrows)
         tree = generate_index_ways(parsed_map,road_types,city_centre)
         tile_ways = put_ways_in_tiles(tree,tiles,city_centre)
         tls = collect(tile_ways)
