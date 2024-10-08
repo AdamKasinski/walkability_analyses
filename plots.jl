@@ -45,7 +45,7 @@ function plot_attractiveness_of_sectors_prcnt(cities_attr,labels,title)
     Plots.plot(x_axis,cities_attr, labels = labels,marker=(:circle,2), title=title)
 end
 
-function tile_plot(boundaries, density, xs, ys)
+function tile_plot(boundaries, density, xs, ys, title)
     
     figure = Plots.plot()
     grouped_ways = DataFrames.groupby(boundaries, :wayid)
@@ -56,7 +56,7 @@ function tile_plot(boundaries, density, xs, ys)
     for (key, way) in pairs(grouped_ways)
         Plots.plot!(figure, way.x, way.y, label="wayid $(key)", 
                     line=:path,legend=false,linecolor=:red,
-                                        linewidth=2)
+                                        linewidth=2, title=title)
     end
     return figure
 end

@@ -10,6 +10,7 @@ include("sectors.jl")
 include("transform.jl")
 include("point_search.jl")
 
+DATA_PATH = "../data"
 
 """
 - 'points'::Array{LLA,2} - matrix with LLA points
@@ -119,7 +120,6 @@ function change_ENU_center(map_nodes, current_center, final_center)
     return Dict(zip(node_keys, ENUs))
 end
 
-
 function calculate_attractiveness_for_city_points(city_name::String, 
                         admin_level::String, search_area::Int,attr::Symbol,
                         wilderness_distance,shape;calculate_percent=false,
@@ -127,16 +127,16 @@ function calculate_attractiveness_for_city_points(city_name::String,
                         scrape_config = nothing,
                         calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                         distance=OpenStreetMapX.distance,
-                        rectangle_boundaries = [],in_admin_bounds=true)
+                        rectangle_boundaries = [],in_admin_bounds=true,dir=DATA_PATH)
     
     points, admin_city_centre, ix_city, df_city, city_boundaries, city_map = prepare_city_map(city_name, 
-                        admin_level, search_area, attr,
+                        admin_level, search_area,
                         wilderness_distance,shape; calculate_percent,
                         distance_sectors,num_of_points,num_of_sectors,
                         scrape_config,
                         calculate_attractiveness=OSMToolset.calculate_attractiveness, 
                         distance=OpenStreetMapX.distance,
-                        rectangle_boundaries,in_admin_bounds=in_admin_bounds)
+                        rectangle_boundaries,in_admin_bounds=in_admin_bounds,dir)
     
     if distance == :actual_route_distance_arg
         distance = (enu1, enu2) -> actual_route_distance(g,
@@ -152,7 +152,26 @@ function calculate_attractiveness_for_city_points(city_name::String,
             city_boundaries
 end
 
+function calculate_attractiveness_for_city_points(
+        prepared_city_data, attr::Symbol;
+        calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
+        distance=OpenStreetMapX.distance)
 
+    points, admin_city_centre, ix_city, df_city, city_boundaries, city_map = prepared_city_data
+
+    if distance == :actual_route_distance_arg
+    distance = (enu1, enu2) -> actual_route_distance(g,
+                            city_map,admin_city_centre, 
+                            enu1, enu2)
+    end
+
+    return points,
+    calculate_attractiveness_of_points(points,
+                ix_city,attr,admin_city_centre,
+    calculate_attractiveness = calculate_attractiveness, 
+    distance = distance),
+    city_boundaries
+end
 
 
 """
@@ -178,7 +197,7 @@ function calculate_attractiveness_for_city_sectors(city_name::String, admin_leve
                         scrape_config = nothing,
                         calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                         distance=OpenStreetMapX.distance,
-                        rectangle_boundaries = [])
+                        rectangle_boundaries = [],dir=DATA_PATH)
 
     
     sectors, admin_city_centre, ix_city, df_city, city_boundaries, city_map = prepare_city_sectors(city_name, 
@@ -189,7 +208,7 @@ function calculate_attractiveness_for_city_sectors(city_name::String, admin_leve
                                         num_of_sectors, scrape_config,
                     calculate_attractiveness=OSMToolset.calculate_attractiveness, 
                                         distance=OpenStreetMapX.distance,
-                                        rectangle_boundaries)
+                                        rectangle_boundaries,dir)
 
     if distance == :actual_route_distance_arg
         distance = (enu1, enu2) -> actual_route_distance(g,
