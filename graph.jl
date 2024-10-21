@@ -50,7 +50,8 @@ function find_intersections(highways)
     return roads, intersections, roads_tags
 end
 
-function ways_to_edges(ways,road_tags,parsed_map)
+function ways_to_edges(ways,road_tags,parsed_map,intersections)
+    nodes_dict = Dict(i=>Set{Int} for i in intersections)
     edges = []
     for key in keys(ways)
         way = ways[key]
@@ -64,6 +65,7 @@ function ways_to_edges(ways,road_tags,parsed_map)
                     key,#way
                     road_tags[key]["highway"])# type
                 push!(edges,edge)
+                push!(nodes_dict[way[i+1]],way[i])
             end
             edge = Edge(
                     way[i], #from
@@ -73,9 +75,10 @@ function ways_to_edges(ways,road_tags,parsed_map)
                     key,  #way
                     road_tags[key]["highway"])# type
             push!(edges,edge)
+            push!(nodes_dict[way[i]],way[i+1])
         end
     end
-    return edges
+    return edges, nodes_dict
 end
 
 function edges_to_df(edges)
