@@ -21,11 +21,12 @@ include("transform.jl")
 #                "motorway_link", "trunk_link", "primary_link", "secondary_link", 
 #                "tertiary_link"]   
 
+DATA_PATH = "../data"
 
 function calc_all_tiles_length(city_file,city_centre,
-                                road_types,tiles,ncols,nrows)
+                                road_types,tiles,ncols,nrows;dir=DATA_PATH)
 
-        parsed_map = OpenStreetMapX.parseOSM("$city_file.osm")
+        parsed_map = OpenStreetMapX.parseOSM(string(dir,"/","$city_file.osm"))
         tree = generate_index_ways(parsed_map,road_types,city_centre)
         tile_ways = put_ways_in_tiles(tree,tiles,city_centre)
         tls = collect(tile_ways)
@@ -124,10 +125,10 @@ function rectangle(bounds, centre)
             ENU_coords.max_y, ENU_coords.max_y]
 end
 
-function get_city_bounds(city_name)
+function get_city_bounds(city_name;dir=DATA_PATH)
     boundaries_file = string(city_name,"_boundaries.osm")
-    admin_city_centre = get_city_centre(boundaries_file)
-    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre)
+    admin_city_centre = get_city_centre(boundaries_file;dir=dir)
+    city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre;dir=dir)
     return city_boundaries, admin_city_centre
 end
 
@@ -139,13 +140,13 @@ function extract_tiles(city::String, nrows::Int, ncols::Int, out_dir)
         mkdir(out_dir)
     end
     
-    tile_osm_file(string(city,".osm"), nrow=nrows,ncol=ncols,
+    tile_osm_file(string(dir,"/",city,".osm"), nrow=nrows,ncol=ncols,
                                                 out_dir=out_dir)
 
 end
 
-function split_map(city, admin_level)
-    bnds = get_city_bounds(city,admin_level)
+function split_map(city, admin_level;dir=DATA_PATH)
+    bnds = get_city_bounds(city,admin_level;dir=dir)
     minlat = bnds["minlat"]
     minlon = bnds["minlon"]
     maxlat = bnds["maxlat"]
@@ -154,7 +155,7 @@ function split_map(city, admin_level)
 end
 
 function get_tile_values_from_files(city::String, nrows, ncols, tiles_path,
-                                    road_types;get_density=true)
+                                    road_types;get_density=true;dir=DATA_PATH)
 
     num_of_tiles::Int = nrows*ncols
     files = readdir(tiles_path)
@@ -165,7 +166,7 @@ function get_tile_values_from_files(city::String, nrows, ncols, tiles_path,
     xs::Matrix{Float64} = zeros(Float64,num_of_tiles,4)
     ys::Matrix{Float64} = zeros(Float64,num_of_tiles,4)
 
-    boundaries, admin_city_centre = get_city_bounds(city)
+    boundaries, admin_city_centre = get_city_bounds(city;dir=dir)
     for (i, elem) in enumerate(files)
         file = joinpath(tiles_path,elem)
         city_parse = OpenStreetMapX.parseOSM(file)
@@ -214,8 +215,8 @@ function agregate_values_in_tiles(loc_points::Matrix{Union{Nothing, ENU}},
     return xs,ys,vals
 end
 
-function generate_tiles(city::String,admin_level::String,nrows::Int,ncols::Int)
-    bnds::OSMToolset.Bounds = split_map(city,admin_level)
+function generate_tiles(city::String,admin_level::String,nrows::Int,ncols::Int;dir=DATA_PATH)
+    bnds::OSMToolset.Bounds = split_map(city,admin_level;dir=dir)
     tiles::Matrix{OSMToolset.Bounds} = reshape(
         OSMToolset.BoundsTiles(;bounds=bnds,nrow=nrows,ncol=ncols).tiles,(nrows*ncols,1))
     return tiles

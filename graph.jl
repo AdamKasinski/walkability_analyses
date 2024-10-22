@@ -6,6 +6,7 @@ using OpenStreetMapX
 using SparseArrays
 
 struct Edge
+    id::Int
     from::Int
     to::Int
     from_LLA::LLA
@@ -49,25 +50,26 @@ function find_intersections(highways)
     end
     return roads, intersections, roads_tags
 end
-
-function ways_to_edges(ways,road_tags,parsed_map,intersections)
-    nodes_dict = Dict(i=>Set{Int} for i in intersections)
+function ways_to_edges(ways,road_tags,parsed_map)
     edges = []
+    id=1
     for key in keys(ways)
         way = ways[key]
         for i in 1:length(way)-1
             if !haskey(road_tags[key],"oneway")
                 edge = Edge(
-                    way[i+1], #from    
-                    way[i], #to
-                    parsed_map.nodes[way[i+1]],#from_LLA
-                    parsed_map.nodes[way[i]],#to_LLA
-                    key,#way
-                    road_tags[key]["highway"])# type
+                        id,#id
+                        way[i+1], #from    
+                        way[i], #to
+                        parsed_map.nodes[way[i+1]],#from_LLA
+                        parsed_map.nodes[way[i]],#to_LLA
+                        key,#way
+                        road_tags[key]["highway"])# type
                 push!(edges,edge)
-                push!(nodes_dict[way[i+1]],way[i])
+                id+=1
             end
             edge = Edge(
+                    id,#id
                     way[i], #from
                     way[i+1],#to
                     parsed_map.nodes[way[i]],#from_LLA
@@ -75,10 +77,10 @@ function ways_to_edges(ways,road_tags,parsed_map,intersections)
                     key,  #way
                     road_tags[key]["highway"])# type
             push!(edges,edge)
-            push!(nodes_dict[way[i]],way[i+1])
+            id+=1
         end
     end
-    return edges, nodes_dict
+    return edges
 end
 
 function edges_to_df(edges)
@@ -94,7 +96,10 @@ function edges_to_df(edges)
     return df
 end
 
-function get_sparsevec(df)
-    edg = [(i,j) for (i,j) in zip(df.from,df.to)]
-    return sparsevec(df.id,edg)
+function create_sparse_index(from, to, ids, intersections)
+    nodes_indices = Dict(node => id for (id, node) in enumerate(intersections))
+    from_indices = [nodes_indices[node] for node in from]
+    to_indices = [nodes_indices[node] for node in to]
+    index_matrix = sparse(from_indices, to_indices, ids)
+    return nodes_indices,index_matrix
 end
