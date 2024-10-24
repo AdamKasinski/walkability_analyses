@@ -7,6 +7,8 @@ using SparseArrays
 
 struct Edge
     id::Int
+    from_id::Int
+    to_id::Int
     from::Int
     to::Int
     from_LLA::LLA
@@ -25,15 +27,21 @@ function filter_ways(ways,road_types)
     return filtered_ways
 end
 
-function find_intersections(highways)
+function find_intersections(highways,parsed_map)
     seen = Set{Int}()
     intersections = Set{Int}()
     roads = Dict{Int,Vector{Int}}()
     roads_tags = Dict{Int,Dict{String,String}}()
+    nds = Dict{Int,Tuple{LLA,Int}}()
+    node_id = 1
     for highway in highways
         for i = 1:length(highway.nodes)
             if i == 1 || i == length(highway.nodes) || (highway.nodes[i] in seen)
                 push!(intersections, highway.nodes[i])
+                if !haskey(nds,highway.nodes[i])
+                    nds[highway.nodes[i]] = (parsed_map.nodes[highway.nodes[i]],node_id)
+                    node_id+=1
+                end
             else
                 push!(seen, highway.nodes[i])
             end
@@ -48,9 +56,9 @@ function find_intersections(highways)
             end
         end
     end
-    return roads, intersections, roads_tags
+    return roads, intersections, roads_tags, nds
 end
-function ways_to_edges(ways,road_tags,parsed_map)
+function ways_to_edges(ways,road_tags,parsed_map,nodes)
     edges = []
     id=1
     for key in keys(ways)
@@ -59,6 +67,8 @@ function ways_to_edges(ways,road_tags,parsed_map)
             if !haskey(road_tags[key],"oneway")
                 edge = Edge(
                         id,#id
+                        nodes[way[i+1]][2],#node_from_id
+                        nodes[way[i]][2],#node_to_id
                         way[i+1], #from    
                         way[i], #to
                         parsed_map.nodes[way[i+1]],#from_LLA
@@ -70,6 +80,8 @@ function ways_to_edges(ways,road_tags,parsed_map)
             end
             edge = Edge(
                     id,#id
+                    nodes[way[i]][2],#node_from_id
+                    nodes[way[i+1]][2],#node_to_id
                     way[i], #from
                     way[i+1],#to
                     parsed_map.nodes[way[i]],#from_LLA
@@ -86,6 +98,8 @@ end
 function edges_to_df(edges)
     df = DataFrame(
         id = [i for i in 1:length(edges)],
+        from_id = [edge.from_id for edge in edges],
+        to_id = [edge.to_id for edge in edges],
         from = [edge.from for edge in edges],
         to = [edge.to for edge in edges],
         from_LLA = [edge.from_LLA for edge in edges],         
@@ -96,10 +110,6 @@ function edges_to_df(edges)
     return df
 end
 
-function create_sparse_index(from, to, ids, intersections)
-    nodes_indices = Dict(node => id for (id, node) in enumerate(intersections))
-    from_indices = [nodes_indices[node] for node in from]
-    to_indices = [nodes_indices[node] for node in to]
-    index_matrix = sparse(from_indices, to_indices, ids)
-    return nodes_indices,index_matrix
+function create_sparse_index(from, to, ids)
+    return sparse(from, to, ids)
 end
