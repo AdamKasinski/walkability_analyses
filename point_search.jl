@@ -5,6 +5,22 @@ using Luxor
 using SpatialIndexing
 
 
+
+function generate_index_nodes(nodes) 
+    data = SpatialElem{Float64, 2, Int64, Int}[]
+    id = 1
+    for node in nodes
+        rect = SpatialIndexing.Rect((node[1].lat,node[1].lon),
+                                    (node[1].lat,node[1].lon))
+        push!(data,SpatialElem(rect,id,node[2]))
+        id+=1
+    end
+    tree = RTree{Float64,2}(Int, Int, variant=SpatialIndexing.RTreeStar)
+    SpatialIndexing.load!(tree,data)
+end
+
+
+
 function generate_index_ways(parsed_map, road_types,city_centre) 
     ways = parsed_map.ways
     data = SpatialElem{Float64, 2, Int64, Tuple{Int,Int}}[]

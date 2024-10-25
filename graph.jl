@@ -17,7 +17,7 @@ struct Edge
     type::String
 end
 
-function filter_ways(ways,road_types)
+function filter_ways(ways::Vector{Way},road_types::Vector{String})
     filtered_ways = Vector{OpenStreetMapX.Way}()
     for way in ways
         if haskey(way.tags, "highway") && (way.tags["highway"] in road_types)
@@ -27,7 +27,7 @@ function filter_ways(ways,road_types)
     return filtered_ways
 end
 
-function find_intersections(highways,parsed_map)
+function find_intersections(highways::Vector{Way},parsed_map::OpenStreetMapX.OSMData)
     seen = Set{Int}()
     intersections = Set{Int}()
     roads = Dict{Int,Vector{Int}}()
@@ -58,44 +58,49 @@ function find_intersections(highways,parsed_map)
     end
     return roads, intersections, roads_tags, nds
 end
-function ways_to_edges(ways,road_tags,parsed_map,nodes)
-    edges = []
+
+
+function ways_to_edges(ways::Dict{Int64, Vector{Int64}},
+                        road_tags::Dict{Int64, Dict{String, String}},
+                        parsed_map::OpenStreetMapX.OSMData,nodes::Array{Int})
+    edges = Vector{Edge}(undef,(length(way)-1)*2)
     id=1
     for key in keys(ways)
         way = ways[key]
         for i in 1:length(way)-1
             if !haskey(road_tags[key],"oneway")
-                edge = Edge(
-                        id,#id
-                        nodes[way[i+1]][2],#node_from_id
-                        nodes[way[i]][2],#node_to_id
-                        way[i+1], #from    
-                        way[i], #to
-                        parsed_map.nodes[way[i+1]],#from_LLA
-                        parsed_map.nodes[way[i]],#to_LLA
-                        key,#way
-                        road_tags[key]["highway"])# type
-                push!(edges,edge)
+                edges[id] = Edge(
+                        id,
+                        nodes[way[i+1]][2],
+                        nodes[way[i]][2],
+                        way[i+1],   
+                        way[i],
+                        parsed_map.nodes[way[i+1]],
+                        parsed_map.nodes[way[i]],
+                        key,
+                        road_tags[key]["highway"])
+                #push!(edges,edge)
                 id+=1
             end
-            edge = Edge(
-                    id,#id
-                    nodes[way[i]][2],#node_from_id
-                    nodes[way[i+1]][2],#node_to_id
-                    way[i], #from
-                    way[i+1],#to
-                    parsed_map.nodes[way[i]],#from_LLA
-                    parsed_map.nodes[way[i+1]],#to_LLA
-                    key,  #way
-                    road_tags[key]["highway"])# type
-            push!(edges,edge)
+            edges[id] = Edge(
+                    id,
+                    nodes[way[i]][2],
+                    nodes[way[i+1]][2],
+                    way[i],
+                    way[i+1],
+                    parsed_map.nodes[way[i]],
+                    parsed_map.nodes[way[i+1]],
+                    key,
+                    road_tags[key]["highway"])
+            #push!(edges,edge)
             id+=1
         end
     end
+    resize!(edges,edge_index-1)
     return edges
 end
 
-function edges_to_df(edges)
+function edges_to_df(edges::Vector{Edge})
     df = DataFrame(
         id = [i for i in 1:length(edges)],
         from_id = [edge.from_id for edge in edges],
@@ -110,6 +115,18 @@ function edges_to_df(edges)
     return df
 end
 
-function create_sparse_index(from, to, ids)
+function create_sparse_index(from::Vector{Int}, to::Vector{Int}, ids::Vector{Int})
     return sparse(from, to, ids)
+end
+
+function create_road_index(points::Matrix{Float64};leafsize=25,
+                                                distance=Euclidean(),reorder=false)
+    return KDTree(points,distance;leafsize = leafsize, reorder = reorder)
+end
+
+function find_nearest_point(tree, points_values::Vector{Int}, 
+    points_to_find::Union{Matrix{Float64},Vector{Float64}})
+
+    indices::Vector{Int} = vcat(NearestNeighbors.knn(tree,points_to_find,1)[1]...)
+    return points_values[indices] 
 end
