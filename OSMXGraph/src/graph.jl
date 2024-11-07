@@ -9,7 +9,7 @@ using SparseArrays
 using Distances
 using NearestNeighbors
 using CSV
-
+using JSON
 
 struct Edge
     id::Int
@@ -23,10 +23,8 @@ struct Edge
     type::String
 end
 
-#csv - road graph
-#csv - metadata
+export filter_ways, find_intersections, ways_to_edges, edges_to_df, create_sparse_index, create_road_index, find_nearest_point, create_road_graph, save_nodes, load_nodes, add_nearest_road_point
 
-export filter_ways, find_intersections, ways_to_edges, edges_to_df, create_sparse_index, create_road_index, find_nearest_point
 """
     filter_ways(ways::Vector{Way}, road_types::Vector{String}) -> Vector{Way}
 
@@ -191,7 +189,6 @@ Creates a sparse adjacency matrix representing the connectivity between nodes.
 # Returns
 A 'SparseMatrixCSC' matrix representing node connections.
 """
-
 function create_sparse_index(from::Vector{Int}, to::Vector{Int}, ids::Vector{Int})
     return sparse(from, to, ids)
 end
@@ -211,7 +208,6 @@ Creates a spatial index for searching nearest points based on coordinates.
 # Returns
 A 'KDTree' object for nearest-neighbor queries.
 """
-
 function create_road_index(points::Matrix{Float64};leafsize=25,
                                                 distance=Euclidean(),reorder=false)
     return KDTree(points,distance;leafsize = leafsize, reorder = reorder)
@@ -231,7 +227,6 @@ Finds the nearest point in 'points_values' for each point in 'points_to_find' us
 # Returns
 A vector of indices corresponding to the nearest points in 'points_values'.
 """
-
 function find_nearest_point(tree, points_values::Vector{Int}, 
                 points_to_find::Union{Matrix{Float64},Vector{Float64}})
     indices::Vector{Int} = vcat(NearestNeighbors.knn(tree,points_to_find,1)[1]...)
@@ -268,6 +263,66 @@ A DataFrame
 function read_file(file_name::String;dir::String=".")
     file = string(dir,"/",file_name)
     return DataFrame(CSV.File(file))
+end
+
+function create_road_graph(road_file,node_file,dir)
+    df = OSMXGraph.read_file(string(dir,"/",road_file))
+    sparse_index = OSMXGraph.create_sparse_index(df.from_id,df.to_id,df.id)
+    nodes = load_nodes(string(dir,"/",node_file))
+    lats = [node[1].lat for node in values(nodes)]
+    lons = [node[1].lon for node in values(nodes)]
+    vals = [node[2] for node in values(nodes)]
+    road_mtrx = Matrix(transpose([lats lons]))
+    road_index = OSMXGraph.create_road_index(road_mtrx)
+    return df, sparse_index, road_index, vals
+end
+
+function create_road_graph(osm_file,road_types,dir_in,
+                            graph_file_name,node_file_name,dir_out)
+    
+    if isfile(string(dir_out,"/",graph_file_name)) && isfile(string(dir_out,"/",node_file_name))
+        return create_road_graph(graph_file_name,node_file_name,dir_out)
+    end
+    parsed = OpenStreetMapX.parseOSM(string(dir_in,"/",osm_file))
+    ways = parsed.ways
+    filtered_ways = filter_ways(ways,road_types)
+    ways_intersections, intersections, road_tags, nodes = OSMXGraph.find_intersections(filtered_ways, parsed)
+    edges = OSMXGraph.ways_to_edges(ways_intersections,road_tags,parsed,nodes)
+    df = OSMXGraph.edges_to_df(edges)
+    save_file(df,string(dir_out,"/",graph_file_name))
+    save_nodes(nodes,string(dir_out,"/",node_file_name))
+    sparse_index = OSMXGraph.create_sparse_index(df.from_id,df.to_id,df.id)
+    lats = [node[1].lat for node in values(nodes)]
+    lons = [node[1].lon for node in values(nodes)]
+    vals = [node[2] for node in values(nodes)]
+    road_mtrx = Matrix(transpose([lats lons]))
+    road_index = OSMXGraph.create_road_index(road_mtrx)
+    return df, sparse_index, road_index, vals
+end
+
+function save_nodes(nodes, file_name)
+    dict_json = Dict(
+        string(key) => [(value[1].lat, value[1].lon), value[2]] for 
+                                                    (key, value) in nodes)
+    open(file_name, "w") do f
+        JSON.print(f, dict_json)
+    end
+end
+
+function load_nodes(file_name)
+    node_json = JSON.parsefile(file_name)
+    nodes = Dict(
+        parse(Int, key) => (LLA(value[1][1], value[1][2], 0.0), value[2])
+        for (key, value) in node_json
+    )
+    return nodes
+end
+
+function add_nearest_road_point(POI_df,POI_xs,POI_ys,road_index,road_nodes)
+    POI_mtrx = Matrix(transpose([POI_xs POI_ys]))
+    nearest_points = OSMXGraph.find_nearest_point(road_index,road_nodes,POI_mtrx)
+    POI_df.nearest_road_node = nearest_points
+    return POI_df
 end
 
 end
