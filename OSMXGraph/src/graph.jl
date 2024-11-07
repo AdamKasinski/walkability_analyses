@@ -23,7 +23,7 @@ struct Edge
     type::String
 end
 
-export filter_ways, find_intersections, ways_to_edges, edges_to_df, create_sparse_index, create_road_index, find_nearest_point, create_road_graph, save_nodes, load_nodes, add_nearest_road_point
+export filter_ways, find_intersections, ways_to_edges, edges_to_df, create_sparse_index, create_road_index, find_nearest_point, save_file, read_file, create_road_graph, save_nodes, load_nodes, add_nearest_road_point
 
 """
     filter_ways(ways::Vector{Way}, road_types::Vector{String}) -> Vector{Way}
@@ -251,6 +251,8 @@ function save_file(df::DataFrame,save_as::String;dir=".")
 end
 
 """
+    read_file(file_name::String;dir::String=".")
+
 Reads a .CSV file as a 'DataFrame'.
 
 #Arguments
@@ -265,23 +267,66 @@ function read_file(file_name::String;dir::String=".")
     return DataFrame(CSV.File(file))
 end
 
-function create_road_graph(road_file,node_file,dir)
+"""
+    create_road_graph(road_file::String, node_file::String; dir::String=".") -> (DataFrame, SparseMatrixCSC, KDTree, Vector{Int})
+
+Loads road graph data from CSV and JSON files and constructs the graph and spatial index structures.
+
+# Arguments
+
+- `road_file`: The filename of the CSV file containing road edge data.
+- `node_file`: The filename of the JSON file containing node data.
+- `dir`: The directory where the files are located. Defaults to the current directory `"."`.
+
+# Returns
+
+A tuple containing:
+- `df`: A `DataFrame` of edges loaded from `road_file`.
+- `sparse_index`: A `SparseMatrixCSC` representing the adjacency matrix of the graph.
+- `road_index`: A `KDTree` for spatial indexing of road nodes.
+- `node_indices`: A vector of node indices.
+"""
+function create_road_graph(road_file::String,node_file::String;dir::String=".")
     df = OSMXGraph.read_file(string(dir,"/",road_file))
     sparse_index = OSMXGraph.create_sparse_index(df.from_id,df.to_id,df.id)
     nodes = load_nodes(string(dir,"/",node_file))
     lats = [node[1].lat for node in values(nodes)]
     lons = [node[1].lon for node in values(nodes)]
-    vals = [node[2] for node in values(nodes)]
+    node_indices = [node[2] for node in values(nodes)]
     road_mtrx = Matrix(transpose([lats lons]))
     road_index = OSMXGraph.create_road_index(road_mtrx)
-    return df, sparse_index, road_index, vals
+    return df, sparse_index, road_index, node_indices
 end
 
-function create_road_graph(osm_file,road_types,dir_in,
-                            graph_file_name,node_file_name,dir_out)
+"""
+    create_road_graph(osm_file::String, road_types::Vector{String}, graph_file_name::String, node_file_name::String; dir_in::String=".", dir_out::String=".") -> (DataFrame, SparseMatrixCSC, KDTree, Vector{Int})
+
+Parses an OSM file to create a road graph and spatial index structures, saving the results to files.
+
+# Arguments
+
+- `osm_file`: The filename of the OpenStreetMap (`.osm`) file to parse.
+- `road_types`: A vector of strings specifying the highway types to include.
+- `graph_file_name`: The filename to save the edge `DataFrame` as (including `.csv`).
+- `node_file_name`: The filename to save the node data as (including `.json`).
+- `dir_in`: The directory where the OSM file is located. Defaults to the current directory `"."`.
+- `dir_out`: The directory where the output files will be saved. Defaults to the current directory `"."`.
+
+# Returns
+
+A tuple containing:
+- `df`: A `DataFrame` of edges.
+- `sparse_index`: A `SparseMatrixCSC` representing the adjacency matrix of the graph.
+- `road_index`: A `KDTree` for spatial indexing of road nodes.
+- `vals`: A vector of node indices.
+
+If the specified output files already exist, the function loads data from these files instead of parsing the OSM file.
+"""
+function create_road_graph(osm_file::String,road_types::Vector{String},
+                            graph_file_name::String,node_file_name::String;dir_in::String=".",dir_out::String=".")
     
     if isfile(string(dir_out,"/",graph_file_name)) && isfile(string(dir_out,"/",node_file_name))
-        return create_road_graph(graph_file_name,node_file_name,dir_out)
+        return create_road_graph(graph_file_name,node_file_name,dir=dir_out)
     end
     parsed = OpenStreetMapX.parseOSM(string(dir_in,"/",osm_file))
     ways = parsed.ways
@@ -300,7 +345,19 @@ function create_road_graph(osm_file,road_types,dir_in,
     return df, sparse_index, road_index, vals
 end
 
-function save_nodes(nodes, file_name)
+"""
+    save_nodes(nodes::Dict{Int, Tuple{LLA, Int}}, file_name::String)
+
+Saves node data to a JSON file.
+
+# Arguments
+
+- `nodes`: A dictionary mapping node IDs to tuples containing `LLA` coordinates and an index.
+- `file_name`: The filename to save the node data to.
+
+The node data is saved in JSON format, where each key is a node ID (as a string), and each value is a tuple containing the latitude and longitude (as a tuple), and the index.
+"""
+function save_nodes(nodes::Dict{Int, Tuple{LLA, Int}}, file_name::String)
     dict_json = Dict(
         string(key) => [(value[1].lat, value[1].lon), value[2]] for 
                                                     (key, value) in nodes)
@@ -309,7 +366,20 @@ function save_nodes(nodes, file_name)
     end
 end
 
-function load_nodes(file_name)
+"""
+    load_nodes(file_name::String) -> Dict{Int, Tuple{LLA, Int}}
+
+Loads node data from a JSON file.
+
+# Arguments
+
+- `file_name`: The filename of the JSON file containing node data.
+
+# Returns
+
+A dictionary mapping node IDs (as integers) to tuples containing `LLA` coordinates and an index.
+"""
+function load_nodes(file_name::String)
     node_json = JSON.parsefile(file_name)
     nodes = Dict(
         parse(Int, key) => (LLA(value[1][1], value[1][2], 0.0), value[2])
@@ -318,7 +388,25 @@ function load_nodes(file_name)
     return nodes
 end
 
-function add_nearest_road_point(POI_df,POI_xs,POI_ys,road_index,road_nodes)
+"""
+    add_nearest_road_point(POI_df::DataFrame, POI_xs::Vector{Float64}, POI_ys::Vector{Float64}, road_index::KDTree, road_nodes::Vector{Int}) -> DataFrame
+
+Finds the nearest road node for each point of interest (POI) and adds it to the `DataFrame`.
+
+# Arguments
+
+- `POI_df`: A `DataFrame` containing the points of interest.
+- `POI_xs`: A vector of x-coordinates (longitude) for the POIs.
+- `POI_ys`: A vector of y-coordinates (latitude) for the POIs.
+- `road_index`: A `KDTree` representing the spatial index of road nodes.
+- `road_nodes`: A vector of node indices corresponding to the points in `road_index`.
+
+# Returns
+
+The updated `POI_df` `DataFrame` with a new column `nearest_road_node`, containing the index of the nearest road node for each POI.
+"""
+function add_nearest_road_point(POI_df::DataFrame,POI_xs::Vector{Float64},POI_ys::Vector{Float64},
+                                road_index::KDTree,road_nodes::Vector{Int})
     POI_mtrx = Matrix(transpose([POI_xs POI_ys]))
     nearest_points = OSMXGraph.find_nearest_point(road_index,road_nodes,POI_mtrx)
     POI_df.nearest_road_node = nearest_points
