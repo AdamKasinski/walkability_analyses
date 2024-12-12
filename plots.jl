@@ -58,5 +58,6 @@ function tile_plot(boundaries, density, xs, ys, title)
                     line=:path,legend=false,linecolor=:red,
                                         linewidth=2, title=title)
     end
+    Plots.scatter!(figure,[0.0],[0.0])
     return figure
 end

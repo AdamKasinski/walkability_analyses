@@ -42,6 +42,17 @@ function calc_all_tiles_length(city_file,city_centre,
         return tls_vals, xs, ys
 end
 
+function center_in_tile(tiles,city_centre)
+    for (ind,tile) in tiles
+        min_point = ENU(LLA(tile.minlat,tile.minlon,0.0),city_centre)
+        max_point = ENU(LLA(tile.maxlat,tile.maxlon,0.0),city_centre)
+        if min_point.east*max_point.east < 0 && min_point.north*max_point.north <0
+            return ind
+        end
+    end
+
+end
+
 function put_ways_in_tiles(tree,tiles,city_centre)
     ways_in_tile = []
     for (ind, tile) in enumerate(tiles)
@@ -155,7 +166,7 @@ function split_map(city, admin_level;dir=DATA_PATH)
 end
 
 function get_tile_values_from_files(city::String, nrows, ncols, tiles_path,
-                                    road_types;get_density=true;dir=DATA_PATH)
+                                    road_types;get_density=true,dir=DATA_PATH)
 
     num_of_tiles::Int = nrows*ncols
     files = readdir(tiles_path)
