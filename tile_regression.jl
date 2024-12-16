@@ -9,6 +9,7 @@ using KernelDensity
 using Parsers
 using Downloads
 using OSMToolset
+using Base.Threads
 include("kernel_density.jl")
 include("distance.jl")
 include("prepare_data.jl")
@@ -21,37 +22,35 @@ include("transform.jl")
 #                "motorway_link", "trunk_link", "primary_link", "secondary_link", 
 #                "tertiary_link"]   
 
-DATA_PATH = "../data"
 
-function calc_all_tiles_length(city_file,city_centre,
-                                road_types,tiles,ncols,nrows;dir=DATA_PATH)
 
-        parsed_map = OpenStreetMapX.parseOSM(string(dir,"/","$city_file.osm"))
-        tree = generate_index_ways(parsed_map,road_types,city_centre)
-        tile_ways = put_ways_in_tiles(tree,tiles,city_centre)
-        tls = collect(tile_ways)
-        xs::Matrix{Float64} = zeros(Float64,ncols*nrows,4)
-        ys::Matrix{Float64} = zeros(Float64,ncols*nrows,4)    
-        tls_vals = []
-        for (ind,tile) in enumerate(collect(tls))
-            tl = tile[2]
-            push!(tls_vals,calc_road_length(parsed_map,city_centre,tl))
-            xs[ind,:] = tile[1][1]
-            ys[ind,:] = tile[1][2]
-        end
-        return tls_vals, xs, ys
+function calc_all_tiles_length(parsed_map,city_centre,
+                                road_types,tiles,ncols,nrows)
+
+    tree = generate_index_ways(parsed_map,road_types,city_centre)
+    tls = put_ways_in_tiles(tree,tiles,city_centre)
+    xs::Matrix{Float64} = zeros(Float64,ncols*nrows,4)
+    ys::Matrix{Float64} = zeros(Float64,ncols*nrows,4)    
+    tls_vals = zeros(Float64,length(tls),1)
+    for ind in 1:length(tls)
+        tl = tls[ind][2]
+        tls_vals[ind] = calc_road_length(parsed_map,city_centre,tl)
+        xs[ind,:] = tls[ind][1][1]
+        ys[ind,:] = tls[ind][1][2]
+    end
+    return tls_vals, xs, ys
 end
 
 function center_in_tile(tiles,city_centre)
-    for (ind,tile) in tiles
+    for (ind,tile) in enumerate(tiles)
         min_point = ENU(LLA(tile.minlat,tile.minlon,0.0),city_centre)
         max_point = ENU(LLA(tile.maxlat,tile.maxlon,0.0),city_centre)
-        if min_point.east*max_point.east < 0 && min_point.north*max_point.north <0
+        if min_point.east*max_point.east < 0 && min_point.north*max_point.north < 0
             return ind
         end
     end
-
 end
+
 
 function put_ways_in_tiles(tree,tiles,city_centre)
     ways_in_tile = []
@@ -71,7 +70,7 @@ end
 
 
 function calc_road_length(city_parse, city_centre, tile_data)
-    tile_parse = Dict()
+    tile_parse = Dict{Int, Vector{Int}}()
     for tile in tile_data
         if haskey(tile_parse,tile.val[1])
             push!(tile_parse[tile.val[1]],tile.val[2])
@@ -80,12 +79,9 @@ function calc_road_length(city_parse, city_centre, tile_data)
         end
     end
     tile_parse = filter(((k,v),) -> length(v) > 1, tile_parse)
-    
     total_length = 0.0 
     for (key, val) in tile_parse
-        index = findfirst(w -> w.id == key, city_parse.ways)
-        way_nodes = city_parse.ways[index].nodes[sort(val)]
-        nodes = [ENU(city_parse.nodes[nd], city_centre) for nd in way_nodes]
+        nodes = [ENU(city_parse.nodes[nd], city_centre) for nd in val]
         for node_ind in 1:(length(nodes)-1)
             total_length += OpenStreetMapX.distance(nodes[node_ind],
                                                     nodes[node_ind+1])

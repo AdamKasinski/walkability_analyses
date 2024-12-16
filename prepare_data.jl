@@ -11,8 +11,6 @@ using DataFrames
 using Statistics
 include("sectors.jl")
 
-DATA_PATH = "../data"
-
 """ 
 Retrieves the area defined by the outermost vertices of the specified city.
 
@@ -20,7 +18,7 @@ Retrieves the area defined by the outermost vertices of the specified city.
 - 'admin_level'::String: The administrative level of the area being searched.
 - 'dir'::String
 """
-function download_city_with_bounds(city::String, admin_level::String;dir=DATA_PATH)
+function download_city_with_bounds(city::String, admin_level::String;dir::String=".")
     if isfile(string(dir,"/","$city.osm"))
         return "The file is already downloaded"
     end
@@ -66,7 +64,7 @@ Downloads the boundaries of a specified city.
 - 'admin_level'::String: The administrative level of the area being searched.
 - 'dir'::String
 """
-function get_city_bounds(city_name::String,level::String;dir=DATA_PATH)
+function get_city_bounds(city_name::String,level::String;dir::String=".")
     
     if isfile(string(dir,"/",city_name,"_bounds.csv"))
         df = DataFrame(CSV.File(string(dir,"/",city_name,"_bounds.csv")))
@@ -96,7 +94,7 @@ Downloads the map of a specified city from BBBike.
 - 'city'::String: The name of the city for which to download the map.
 - 'dir'::String
 """
-function download_data_from_bbbike(city::String;dir=DATA_PATH)
+function download_data_from_bbbike(city::String;dir::String=".")
     if isfile(string(dir,"/",city,".osm"))
         return "The file is already downloaded"
     else
@@ -123,7 +121,7 @@ Creates a map from an OSM file.
 - 'file'::String: The name of the file used to create the map.
 - 'dir'::String
 """
-function create_map(file::String;use_cache = true,trim_to_connected_graph=true,dir=DATA_PATH)
+function create_map(file::String;use_cache = true,trim_to_connected_graph=true,dir::String=".")
     file = string(dir,"/",file)
     return get_map_data(file,use_cache = use_cache,only_intersections=false,
                         trim_to_connected_graph=trim_to_connected_graph)
@@ -136,7 +134,7 @@ Saves points of interest (POI) from a DataFrame to a CSV file.
 - 'save_as'::String: The name of the CSV file where the data will be saved.
 - 'dir'::String
 """
-function save_asm(df::DataFrame,save_as::String;dir=DATA_PATH)
+function save_asm(df::DataFrame,save_as::String;dir::String=".")
     save_as=string(dir,"/",save_as)
     if save_as != ""
         CSV.write(save_as,df)
@@ -151,7 +149,7 @@ Creates a Points of Interest (POI) file based on an OSM file.
 - 'save_as'::String: The name of the CSV file where the POI table will be saved.
 - 'dir'::String
 """
-function get_POI(filename::String,scrape_config = nothing, save_as::String = "";dir=DATA_PATH) 
+function get_POI(filename::String,scrape_config = nothing, save_as::String = "";dir::String=".") 
     file = string(dir,"/",filename)
     save_as = string(dir,"/",save_as)
     if endswith(file,"osm")
@@ -175,7 +173,7 @@ Downloads an OSM file containing the boundaries of a specified city.
 - 'admin_level"::String
 - 'dir'::String
 """
-function download_boundaries_file(city::String,admin_level::String;dir=DATA_PATH)
+function download_boundaries_file(city::String,admin_level::String;dir::String=".")
 
     if isfile(string(dir,",",city,"_boundaries.osm"))
         return "The file is already downloaded"
@@ -210,7 +208,7 @@ Extracts city boundaries from an OSM file in ENU format.
 - 'filename'::String: The name of the file containing the boundaries.
 - 'dir'::String
 """
-function extract_points_ENU(filename::String,centre;dir=DATA_PATH)
+function extract_points_ENU(filename::String,centre;dir::String=".")
     file = string(dir,"/",filename)
     osm_file = readxml(file)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
@@ -265,7 +263,7 @@ Extracts city boundaries from an OSM file in LLA format.
 - 'filename'::String: The name of the file containing the boundaries.
 - 'dir'::String
 """
-function extract_points_LLA(filename::String, centre;dir=DATA_PATH)
+function extract_points_LLA(filename::String, centre;dir::String=".")
     file = string(dir,"/",filename)
     osm_file = readxml(file)
     #jako posrednich struktur uzywac ramek danych ze wzgledu na latwosc tesotwania
@@ -298,10 +296,14 @@ end
 - 'boundaries_file'::String,
 - 'dir'::String
 """
-function get_city_centre(boundaries_file::String;dir=DATA_PATH)
+function get_city_centre(boundaries_file::String;dir::String=".")
     osm_file_path = string(dir,"/",boundaries_file)
     osm_file = readxml(osm_file_path)
-    centre_ref = findfirst("//relation/member[@type='node' and @role='admin_centre']",osm_file)["ref"]
+    if findfirst("//relation/member[@type='node' and @role='admin_centre']",osm_file) !== nothing
+        centre_ref = findfirst("//relation/member[@type='node' and @role='admin_centre']",osm_file)["ref"]
+    else
+        centre_ref = findfirst("//relation/member[@type='node' and @role='label']", osm_file)["ref"]
+    end
     centre_node = findfirst("//node[@id='$centre_ref']",osm_file)
     lat = parse(Float64, centre_node["lat"])
     lon = parse(Float64, centre_node["lon"])
@@ -315,7 +317,7 @@ function prepare_city_map(city_name::String,
                 scrape_config = nothing,
                 calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                 distance=OpenStreetMapX.distance,
-                rectangle_boundaries = [], in_admin_bounds=true,dir=DATA_PATH)
+                rectangle_boundaries = [], in_admin_bounds=true,dir::String=".")
     
     download_city_with_bounds(city_name,admin_level;dir=dir)
     
@@ -384,7 +386,7 @@ function prepare_city_sectors(city_name::String, admin_level::String,
                             num_of_sectors=0, scrape_config = nothing,
                 calculate_attractiveness::Function=OSMToolset.calculate_attractiveness, 
                             distance=OpenStreetMapX.distance,
-                            rectangle_boundaries = [],dir=DATA_PATH)
+                            rectangle_boundaries = [],dir::String=".")
     
     download_city_with_bounds(city_name,admin_level;dir=dir)
 

@@ -19,16 +19,14 @@ function generate_index_nodes(nodes)
     SpatialIndexing.load!(tree,data)
 end
 
-
-
 function generate_index_ways(parsed_map, road_types,city_centre) 
     ways = parsed_map.ways
     data = SpatialElem{Float64, 2, Int64, Tuple{Int,Int}}[]
     id = 1
     for way in ways
         if haskey(way.tags, "highway") && (way.tags["highway"] in road_types)
-            for point in 1:(length(way.nodes))
-                node = ENU(parsed_map.nodes[way.nodes[point]],city_centre)
+            for point in way.nodes
+                node = ENU(parsed_map.nodes[point],city_centre)
                 rect = SpatialIndexing.Rect((node.east,node.north),
                                             (node.east,node.north))
                 push!(data,SpatialElem(rect,id,(way.id,point)))
