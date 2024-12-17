@@ -23,6 +23,25 @@ include("transform.jl")
 #                "tertiary_link"]   
 
 
+function calc_all_tiles_density(parsed_map,city_centre,
+    road_types,tiles,ncols,nrows)
+
+    tree = generate_index_ways(parsed_map,road_types,city_centre)
+    tls = put_ways_in_tiles(tree,tiles,city_centre)
+    xs::Matrix{Float64} = zeros(Float64,ncols*nrows,4)
+    ys::Matrix{Float64} = zeros(Float64,ncols*nrows,4)    
+    tls_density = zeros(Float64,length(tls))
+    for ind in 1:length(tls)
+        tl = tls[ind][2]
+        tls_vals = calc_road_length(parsed_map,city_centre,tl)
+        tls_area = calc_tile_area(tiles[ind],city_centre)
+        tls_density[ind] = tls_vals/tls_area
+        xs[ind,:] = tls[ind][1][1]
+        ys[ind,:] = tls[ind][1][2]
+    end
+    return tls_density, xs, ys
+end
+
 
 function calc_all_tiles_length(parsed_map,city_centre,
                                 road_types,tiles,ncols,nrows)
@@ -110,6 +129,18 @@ function calc_tile_area(bounds,tile_centre)
     node1 = ENU(bounds,tile_centre)
     return node1.min_x*2*node1.min_y*2
 end
+
+function calc_tile_area(bounds::OSMToolset.Bounds,city_centre::LLA)
+    ld = ENU(LLA(bounds.minlat,bounds.minlon,0.0),city_centre)
+    rd = ENU(LLA(bounds.minlat,bounds.maxlon,0.0),city_centre)
+    lu = ENU(LLA(bounds.maxlat,bounds.minlon,0.0),city_centre)
+    ru = ENU(LLA(bounds.maxlat,bounds.maxlon,0.0),city_centre)    
+    width = abs(rd.east - ld.east)
+    height = abs(lu.north - ld.north)
+    return width * height
+end
+
+
 
 """
 y - lat/east

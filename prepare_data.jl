@@ -18,11 +18,11 @@ Retrieves the area defined by the outermost vertices of the specified city.
 - 'admin_level'::String: The administrative level of the area being searched.
 - 'dir'::String
 """
-function download_city_with_bounds(city::String, admin_level::String;dir::String=".")
+function download_city_with_bounds(city::String; dir::String=".")
     if isfile(string(dir,"/","$city.osm"))
         return "The file is already downloaded"
     end
-    bounds = get_city_bounds(city,admin_level)
+    bounds = get_city_bounds(city,dir=dir)
     min_lon = bounds["minlon"]
     max_lon = bounds["maxlon"]
     min_lat = bounds["minlat"]
@@ -64,7 +64,7 @@ Downloads the boundaries of a specified city.
 - 'admin_level'::String: The administrative level of the area being searched.
 - 'dir'::String
 """
-function get_city_bounds(city_name::String,level::String;dir::String=".")
+function get_city_bounds_admin_level(city_name::String,level::String;dir::String=".")
     
     if isfile(string(dir,"/",city_name,"_bounds.csv"))
         df = DataFrame(CSV.File(string(dir,"/",city_name,"_bounds.csv")))
@@ -88,6 +88,33 @@ function get_city_bounds(city_name::String,level::String;dir::String=".")
     return bds
 end
 
+
+function get_city_bounds(city_name::String; dir::String=".")
+    if isfile(string(dir, "/", city_name, "_bounds.csv"))
+        df = DataFrame(CSV.File(string(dir, "/", city_name, "_bounds.csv")))
+        return Dict("maxlon" => df.maxlon[1],
+                    "minlon" => df.minlon[1],
+                    "maxlat" => df.maxlat[1],
+                    "minlat" => df.minlat[1])
+    end
+
+    query = "https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=$(city_name)"
+    response = HTTP.get(query)
+    results = JSON.parse(String(response.body))
+
+    for result in results
+        if result["osm_type"] == "relation" && haskey(result, "boundingbox")
+            bounds = Dict(
+                "minlat" => parse(Float64, result["boundingbox"][1]),
+                "maxlat" => parse(Float64, result["boundingbox"][2]),
+                "minlon" => parse(Float64, result["boundingbox"][3]),
+                "maxlon" => parse(Float64, result["boundingbox"][4])
+            )
+            CSV.write(string(dir, "/", city_name, "_bounds.csv"), DataFrame(bounds))
+            return bounds
+        end
+    end
+end
 
 """
 Downloads the map of a specified city from BBBike.
@@ -166,6 +193,16 @@ function get_POI(filename::String,scrape_config = nothing, save_as::String = "";
     end
 end
 
+function get_local_city_name(city::String)
+    query = "https://nominatim.openstreetmap.org/search?format=json&q=$city&limit=1"
+    response = HTTP.get(query)
+    result = JSON.parse(String(response.body))
+    return result#[1]["display_name"]
+
+end
+
+
+
 """
 Downloads an OSM file containing the boundaries of a specified city.
 
@@ -173,16 +210,18 @@ Downloads an OSM file containing the boundaries of a specified city.
 - 'admin_level"::String
 - 'dir'::String
 """
-function download_boundaries_file(city::String,admin_level::String;dir::String=".")
+function download_boundaries_file(city::String;dir::String=".")
+
+    local_name = get_local_city_name(city)[1]["name"]
 
     if isfile(string(dir,",",city,"_boundaries.osm"))
         return "The file is already downloaded"
     end
     query = """
         [out:xml];
-        area[name="$city"]->.searchArea;
+        area[name="$local_name"]->.searchArea;
         (
-        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"="$admin_level"]["name"="$city"];
+        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"~"[6|8]"]["name"="$local_name"];
         );
         out body;
         >;
@@ -319,7 +358,7 @@ function prepare_city_map(city_name::String,
                 distance=OpenStreetMapX.distance,
                 rectangle_boundaries = [], in_admin_bounds=true,dir::String=".")
     
-    download_city_with_bounds(city_name,admin_level;dir=dir)
+    download_city_with_bounds(city_name;dir=dir)
     
     
     if isfile(string(dir,"/","$city_name.csv"))
@@ -328,7 +367,7 @@ function prepare_city_map(city_name::String,
         df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv";dir=dir)
     end
 
-    download_boundaries_file(city_name,admin_level;dir=dir)
+    download_boundaries_file(city_name;dir=dir)
     boundaries_file = string(city_name,"_boundaries.osm")
     city_map = create_map("$city_name.osm";dir=dir)
     city_centre = OpenStreetMapX.center(city_map.bounds)
@@ -336,7 +375,7 @@ function prepare_city_map(city_name::String,
     city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre;dir=dir)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
     if rectangle_boundaries == []
-        rectangle_boundaries = get_city_bounds(city_name,admin_level;dir=dir)
+        rectangle_boundaries = get_city_bounds(city_name;dir=dir)
     end
     nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
     city_tree = generate_index(wilderness_distance, nodes_for_tree)
@@ -388,7 +427,7 @@ function prepare_city_sectors(city_name::String, admin_level::String,
                             distance=OpenStreetMapX.distance,
                             rectangle_boundaries = [],dir::String=".")
     
-    download_city_with_bounds(city_name,admin_level;dir=dir)
+    download_city_with_bounds(city_name;dir=dir)
 
     if isfile(string(dir,"/","$city_name.csv"))
         df_city = get_POI("$city_name.csv",scrape_config;dir=dir)
@@ -396,7 +435,7 @@ function prepare_city_sectors(city_name::String, admin_level::String,
         df_city = get_POI("$city_name.osm",scrape_config,"$city_name.csv";dir=dir)
     end
 
-    download_boundaries_file(city_name,admin_level;dir=dir)
+    download_boundaries_file(city_name;dir=dir)
     boundaries_file = string(city_name,"_boundaries.osm")
     city_map = create_map("$city_name.osm";dir=dir)
     city_centre = OpenStreetMapX.center(city_map.bounds)
@@ -404,7 +443,7 @@ function prepare_city_sectors(city_name::String, admin_level::String,
     city_boundaries = extract_points_ENU(boundaries_file,admin_city_centre;dir=dir)
     ix_city = AttractivenessSpatIndex(df_city,get_range=a->search_area)
     if rectangle_boundaries == []
-        rectangle_boundaries = get_city_bounds(city_name,admin_level;dir=dir)
+        rectangle_boundaries = get_city_bounds(city_name;dir=dir)
     end
     nodes_for_tree = change_ENU_center(city_map.nodes,city_centre, admin_city_centre)
     city_tree = generate_index(wilderness_distance, nodes_for_tree)

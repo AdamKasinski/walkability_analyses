@@ -10,15 +10,15 @@ using OpenStreetMapX
 using KernelDensity
 include("prepare_data.jl")
 
-function get_amenity_values(city_poi::DataFrame,amenity::String)
+function get_amenity_values(city_poi::DataFrame,amenity)
     return city_poi[city_poi.value .== amenity, [:lat,:lon]]
 end
 
-function get_amenity_group(city_poi::DataFrame,amenity::String)
+function get_amenity_group(city_poi::DataFrame,amenity)
     return city_poi[city_poi.group .== amenity, [:lat,:lon]]
 end
 
-function kernel_density(city_sector, attribute::String)
+function kernel_density(city_sector, attribute)
     points = city_sector[1] #TODO add city_sector structure
     admin_city_centre = city_sector[2]
     df_city = city_sector[4]
