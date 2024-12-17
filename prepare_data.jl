@@ -22,7 +22,7 @@ function download_city_with_bounds(city::String; dir::String=".")
     if isfile(string(dir,"/","$city.osm"))
         return "The file is already downloaded"
     end
-    bounds = get_city_bounds(city,dir=dir)
+    bounds = get_city_bounds(city;dir=dir)
     min_lon = bounds["minlon"]
     max_lon = bounds["maxlon"]
     min_lat = bounds["minlat"]

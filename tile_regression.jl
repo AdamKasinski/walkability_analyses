@@ -184,7 +184,7 @@ function extract_tiles(city::String, nrows::Int, ncols::Int, out_dir)
 end
 
 function split_map(city, admin_level;dir=DATA_PATH)
-    bnds = get_city_bounds(city,admin_level;dir=dir)
+    bnds = get_city_bounds(city;dir=dir)
     minlat = bnds["minlat"]
     minlon = bnds["minlon"]
     maxlat = bnds["maxlat"]
