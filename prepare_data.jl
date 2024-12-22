@@ -9,6 +9,7 @@ using JSON
 using EzXML
 using DataFrames
 using Statistics
+using GZip
 include("sectors.jl")
 
 """ 
@@ -97,8 +98,8 @@ function get_city_bounds(city_name::String; dir::String=".")
                     "maxlat" => df.maxlat[1],
                     "minlat" => df.minlat[1])
     end
-
-    query = "https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=$(city_name)"
+    encoded_city_name = HTTP.escapeuri(city_name)
+    query = "https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=$encoded_city_name"
     response = HTTP.get(query)
     results = JSON.parse(String(response.body))
 
@@ -194,7 +195,8 @@ function get_POI(filename::String,scrape_config = nothing, save_as::String = "";
 end
 
 function get_local_city_name(city::String)
-    query = "https://nominatim.openstreetmap.org/search?format=json&q=$city&limit=1"
+    encoded_city_name = HTTP.escapeuri(city)
+    query = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded_city_name&limit=1"
     response = HTTP.get(query)
     result = JSON.parse(String(response.body))
     return result#[1]["display_name"]
@@ -212,21 +214,28 @@ Downloads an OSM file containing the boundaries of a specified city.
 """
 function download_boundaries_file(city::String;dir::String=".")
 
-    local_name = get_local_city_name(city)[1]["name"]
+    osm_id = get_local_city_name(city)[1]["osm_id"]
 
     if isfile(string(dir,",",city,"_boundaries.osm"))
         return "The file is already downloaded"
     end
     query = """
-        [out:xml];
-        area[name="$local_name"]->.searchArea;
-        (
-        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"~"[6|8]"]["name"="$local_name"];
-        );
-        out body;
-        >;
-        out skel qt;
+    [out:xml];
+    relation($osm_id);
+    out body;
+    >;
+    out skel qt;
     """
+#    query = """
+#        [out:xml];
+#        area[name="$local_name"]->.searchArea;
+#        (
+#        relation(area.searchArea)["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4|5|6|7|8]"]["osm_id"="$osm_id"];
+#        );
+#        out body;
+#        >;
+#        out skel qt;
+#    """
     url="http://overpass-api.de/api/interpreter/"
 
     response = HTTP.post(url,body=query)

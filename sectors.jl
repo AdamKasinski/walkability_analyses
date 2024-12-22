@@ -64,14 +64,28 @@ function generate_rectangles(boundaries_east, boundaries_north,
                             min_point, max_point,in_admin_bounds=true)
 
     city_boundaries = Luxor.Point.(boundaries_east,boundaries_north)
-    x_distance = max_point.east - min_point.east
-    y_distance = max_point.north - min_point.north
+    if max_point.east > min_point.east
+        maxeast = max_point.east
+        mineast = min_point.east
+    else
+        maxeast = min_point.east
+        mineast = max_point.east
+    end
+    if max_point.north > min_point.north
+        maxnorth = max_point.north
+        minnorth = min_point.north
+    else
+        maxnorth = min_point.north
+        minnorth = max_point.north
+    end
 
+    x_distance = maxeast - mineast
+    y_distance = maxnorth - minnorth
     num_of_x = ceil(Int,x_distance/distance)
     num_of_y = ceil(Int,y_distance/distance)
 
-    x_cords = range(min_point.east, stop=max_point.east, length=num_of_x)
-    y_cords = range(min_point.north, stop=max_point.north, length=num_of_y)
+    x_cords = range(mineast, stop=maxeast, length=num_of_x)
+    y_cords = range(minnorth, stop=maxnorth, length=num_of_y)
     city_cords = Matrix{Union{ENU,Nothing}}(nothing,num_of_x,num_of_y)
 
     for (x_ind, x) in enumerate(x_cords)
