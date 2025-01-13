@@ -7,7 +7,7 @@ using DataFrames
 function plot_heatmap(city_points, attr_points,boundaries,
                         attribute, city,
                         search_area,
-                        wilderness_distance)
+                        wilderness_distance;add_center=false)
     
     north = [i.north for i in city_points]
     east = [i.east for i in city_points]
@@ -30,6 +30,9 @@ function plot_heatmap(city_points, attr_points,boundaries,
         Plots.plot!(figure, way.x, way.y, label="wayid $(key)", 
                                         line=:path,legend=false,linecolor=:red,
                                         linewidth=2)
+    end
+    if add_center
+        Plots.scatter!(figure,[0.0],[0.0])
     end
     return figure
 end

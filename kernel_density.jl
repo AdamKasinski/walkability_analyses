@@ -41,3 +41,25 @@ function kernel_density(city_sector, attribute)
     pdfs = [pdf(kde_rslt, i[1], i[2]) for i in zip(easts,norths)]
     return reshape(pdfs,(dim1,dim2))
 end
+
+function kernel_density_roads(city_sector, nodes)
+    points = city_sector[1] #TODO add city_sector structure
+    admin_city_centre = city_sector[2]
+    df_city = city_sector[4]
+    dim1 = size(points[:,1])[1]
+    dim2 = size(points[1,:])[1]
+    combined = [LLA(nodes[i].lat, nodes[i].lon, 0.0) for i in eachindex(nodes)]
+    ENUs = zeros(length(combined),2)
+    for point in eachindex(combined)
+        pt = ENU(combined[point], admin_city_centre)
+        ENUs[point,1] = pt.east
+        ENUs[point,2] = pt.north
+    end
+    kde_rslt = kde(ENUs)
+    easts = [points[i, j].east for i in 1:dim1, j in 1:dim2]
+    norths = [points[i, j].north for i in 1:dim1, j in 1:dim2]
+    easts = reshape(easts,(dim1*dim2,1))
+    norths = reshape(norths,(dim1*dim2,1))
+    pdfs = [pdf(kde_rslt, i[1], i[2]) for i in zip(easts,norths)]
+    return reshape(pdfs,(dim1,dim2)), pdf(kde_rslt,0.0,0.0)
+end
