@@ -64,3 +64,31 @@ function tile_plot(boundaries, density, xs, ys, title)
     Plots.scatter!(figure,[0.0],[0.0])
     return figure
 end
+
+
+
+function plot_density_heatmap(city_points, attr_points,boundaries,
+    city;add_center=false)
+
+    north = [i.north for i in city_points]
+    east = [i.east for i in city_points]
+    figure = Plots.scatter(east,north,zcolor = attr_points,legend=false,
+    colorbar=false, aspect_ratio=:equal,
+    markerstrokewidth = 0,
+    markershape=:rect,
+    markersize = 2,
+    title = string("city: ", city),
+    titlefontsize=10,
+    fmt = :svg)
+
+    grouped_ways = DataFrames.groupby(boundaries, :wayid)
+    for (key, way) in pairs(grouped_ways)
+        Plots.plot!(figure, way.x, way.y, label="wayid $(key)", 
+                            line=:path,legend=false,linecolor=:red,
+                            linewidth=2)
+    end
+    if add_center
+        Plots.scatter!(figure,[0.0],[0.0])
+    end
+    return figure
+end

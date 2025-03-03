@@ -1,10 +1,3 @@
-# 1. wyznacz wszystkie punkty w mieście - weź napisaną funkcję
-# 2. wyznacz wszystkie amenities 
-# 3. zrób funkcję, która policzy odległość euklidesową między punktami
-# 4. policz odległości między wszystkimi amenities a punktem
-# 5. użyj KDE
-# 6. przypisz wartość
-
 using DataFrames
 using OpenStreetMapX
 using KernelDensity
@@ -50,10 +43,10 @@ function kernel_density_roads(city_sector, nodes)
     dim2 = size(points[1,:])[1]
     combined = [LLA(nodes[i].lat, nodes[i].lon, 0.0) for i in eachindex(nodes)]
     ENUs = zeros(length(combined),2)
-    for point in eachindex(combined)
-        pt = ENU(combined[point], admin_city_centre)
-        ENUs[point,1] = pt.east
-        ENUs[point,2] = pt.north
+    for p in eachindex(combined)
+        pt = ENU(combined[p], admin_city_centre)
+        ENUs[p,1] = pt.east
+        ENUs[p,2] = pt.north
     end
     kde_rslt = kde(ENUs)
     easts = [points[i, j].east for i in 1:dim1, j in 1:dim2]
