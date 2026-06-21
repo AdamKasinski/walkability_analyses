@@ -20,6 +20,7 @@ Retrieves the area defined by the outermost vertices of the specified city.
 - 'dir'::String
 """
 function download_city_with_bounds(city::String; dir::String=".")
+    
     if isfile(string(dir,"/","$city.osm"))
         return "The file is already downloaded"
     end
@@ -32,7 +33,6 @@ function download_city_with_bounds(city::String; dir::String=".")
     mv(f, string(dir,"/","$city.osm"))
     return string(dir,"/","$city.osm")
 end
-
 """ 
 Downloads the relation ID of a specified city.
 
